@@ -63,7 +63,6 @@ class SakuraLLMTranslator(BaseTranslator):
     ):
         # 初始化变量
         excluded_messages: set[int] = set()
-        frequency_penalty = 0
 
         # 循环翻译
         while True:
@@ -71,6 +70,9 @@ class SakuraLLMTranslator(BaseTranslator):
             messages_to_translate = await get_messages(messages, messages_lock, self.number_per_request_translate, excluded_messages, cache, cache_lock)
             if not messages_to_translate:
                 break
+
+            # 初始化frequency_penalty
+            frequency_penalty = 0
 
             # 一直翻译直到成功
             fatal_flag = False
@@ -142,19 +144,18 @@ class SakuraLLMTranslator(BaseTranslator):
                             answer = json.loads(line.removeprefix("data: "))
                             if answer["choices"][0]["finish_reason"]:
                                 break
-                                
+
                             resp += answer["choices"][0]["delta"]["content"]
 
                             # 检测是否退化
-                            if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 2):
-                                log(self.name, f"检测到退化发生（重复或译文过长）。", level=LogLevel.Info)
-
+                            if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
                                     frequency_penalty += 0.1
-                                    log(self.name, f"增加frequency_penalty重试。目前的frequency_penalty: {frequency_penalty}")
-                                    continue
+                                    log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。目前的frequency_penalty: {frequency_penalty}")
+    
+                                    resp = None
                                 elif len(messages_to_translate) >= 2:
-                                    log(self.name, f"对半拆分重试。")
+                                    log(self.name, f"检测到退化发生(重复或译文过长), 对半拆分重试。")
 
                                     # frequency_penalty归零，对半拆分重试
                                     frequency_penalty = 0
@@ -163,16 +164,17 @@ class SakuraLLMTranslator(BaseTranslator):
                                         for msg in messages_to_translate[:len(messages_to_translate) // 2]:
                                             msg.translating = False
                                             messages_to_translate.remove(msg)
-                                    continue
+                                    resp = None
                                 else:
-                                    log(self.name, f"单句翻译{sources}时失败。", level=LogLevel.Error)
+                                    log(self.name, f"翻译`{sources}`时失败。", level=LogLevel.Error)
 
                                     # 没法拆分了
                                     async with messages_lock:
                                         excluded_messages.add(messages_to_translate[0].index)
                                         messages_to_translate[0].translating = False
 
-                                    resp = None
+                                    fatal_flag = True
+                                break
                 except (HTTPError, RuntimeError) as e:
                     log(self.name, f"请求翻译时发生了错误: {repr(e)}", level=LogLevel.Warning)
 
@@ -186,9 +188,9 @@ class SakuraLLMTranslator(BaseTranslator):
                         await sleep(3)
                         continue
 
-                # 一切正常，frequency_penalty归零
-                frequency_penalty = 0
-                break
+                if resp:
+                    # 一切正常，或者无法翻译
+                    break
 
             if fatal_flag:
                 break
