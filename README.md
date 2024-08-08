@@ -126,11 +126,6 @@ python tktransl.py --input proj/input/ --output proj/output/ --config proj/confi
                 // OpenAI格式的API、时间限制（单位：秒）。
                 "api": "http://127.0.0.1:10086", 
                 "timeout": 5,
-
-                // 可选。用API时发生HTTP错误时，如果存在`restart_api`，就会向该API发送重启服务器的POST请求，服务器应返回"ok"来表示服务器重启成功。
-                "restart_api": "http://127.0.0.1:5000/restart",
-                // 可选。如果存在，将会使用该值作为请求重启服务器的时间限制（单位：秒）。默认为60。
-                "restart_timeout": 60
             }
         ]
     }

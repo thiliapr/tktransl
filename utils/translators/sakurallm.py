@@ -25,8 +25,6 @@ class SakuraLLMTranslator(BaseTranslator):
         api: str,
         timeout: int | float,
         style: str = "文艺",
-        restart_api: Optional[str] = None,
-        restart_timeout: int | float = 60,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -35,8 +33,6 @@ class SakuraLLMTranslator(BaseTranslator):
         self.number_per_request_translate = number_per_request_translate
         self.api = api.removesuffix("/")
         self.model = model
-        self.restart_api = restart_api
-        self.restart_timeout = restart_timeout
 
         # 构造prompt
         if model == "sakura-10":
@@ -147,6 +143,11 @@ class SakuraLLMTranslator(BaseTranslator):
 
                             resp += answer["choices"][0]["delta"]["content"]
 
+                            # 提前结束翻译（不翻译下文）
+                            if resp.endswith("<NextBegin>"):
+                                resp = resp.removesuffix("<NextBegin>")
+                                break
+
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
@@ -177,16 +178,8 @@ class SakuraLLMTranslator(BaseTranslator):
                                 break
                 except (HTTPError, RuntimeError) as e:
                     log(self.name, f"请求翻译时发生了错误: {repr(e)}", level=LogLevel.Warning)
-
-                    if self.restart_api:
-                        log(self.name, f"正在尝试重启服务器。")
-                        response = await self.client.request("POST", self.restart_api, timeout=self.restart_timeout)
-                        if response.content != b"ok":
-                            log(self.name, f"服务器重启失败({response.status_code}): {response.content}", level=LogLevel.Fatal)
-                            fatal_flag = True
-                    else:
-                        await sleep(3)
-                        continue
+                    await sleep(3)
+                    continue
 
                 if resp:
                     # 一切正常，或者无法翻译
@@ -197,15 +190,10 @@ class SakuraLLMTranslator(BaseTranslator):
             elif resp is None:
                 continue
 
-            # 消除EOF
-            resp = resp.replace("*EOF*", "").strip()
-
-            # 删除上文、下文
+            # 删除上文
             if "<PreviousEnd>" in resp:
                 resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):]
-            if "<NextBegin>" in resp:
-                resp = resp[:resp.find("<NextBegin>")]
-            resp = resp.strip("\n")
+            resp = resp.strip()
 
             # 还原
             async with messages_lock:
