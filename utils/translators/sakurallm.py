@@ -238,9 +238,11 @@ class SakuraLLMTranslator(BaseTranslator):
 
                     # 显示翻译
                     if msg.original_speaker:
-                        log(self.name, f"{msg.original_speaker}「{msg.source}」 -> {msg.speaker_translation}「{msg.translation}」", level=LogLevel.Debug)
+                        log(self.name, f"Src: {msg.original_speaker}「{msg.source}」", level=LogLevel.Debug)
+                        log(self.name, f"Dst: {msg.speaker_translation}「{msg.translation}」", level=LogLevel.Debug)
                     else:
-                        log(self.name, f"{msg.source} -> {msg.translation}", level=LogLevel.Debug)
+                        log(self.name, f"Src: {msg.source}", level=LogLevel.Debug)
+                        log(self.name, f"Dst: {msg.translation}", level=LogLevel.Debug)
 
     
     @staticmethod
