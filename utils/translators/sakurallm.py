@@ -144,8 +144,8 @@ class SakuraLLMTranslator(BaseTranslator):
                             resp += answer["choices"][0]["delta"]["content"]
 
                             # 提前结束翻译（不翻译下文）
-                            if resp.endswith("<NextBegin>"):
-                                resp = resp.removesuffix("<NextBegin>")
+                            if "<NextBegin>" in resp:
+                                resp = resp[:resp.find("<NextBegin>")]
                                 break
 
                             # 检测是否退化
@@ -175,6 +175,7 @@ class SakuraLLMTranslator(BaseTranslator):
                                         messages_to_translate[0].translating = False
 
                                     fatal_flag = True
+
                                 break
                 except (HTTPError, RuntimeError) as e:
                     log(self.name, f"请求翻译时发生了错误: {repr(e)}", level=LogLevel.Warning)
@@ -196,14 +197,18 @@ class SakuraLLMTranslator(BaseTranslator):
             resp = resp.strip()
 
             # 还原
+            next = resp
             async with messages_lock:
                 for index, msg in enumerate(messages_to_translate):
-                    content = resp[:resp.find(f"<MSG{index}End>")]
-                    resp = resp[resp.find(f"<MSG{index}End>") + len(f"<MSG{index}End>"):].removeprefix("\n")
+                    content = next[:next.find(f"<MSG{index}End>")]
+                    next = next[next.find(f"<MSG{index}End>") + len(f"<MSG{index}End>"):].removeprefix("\n")
 
                     # 还原说话的人
                     if msg.original_speaker:
-                        speaker, content = content.split("「", 1)
+                        if "「" in content:
+                            speaker, content = content.split("「", 1)
+                        else:
+                            speaker = msg.original_speaker
                         content = content.removesuffix("」")
                     else:
                         speaker = None
