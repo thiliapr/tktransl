@@ -81,10 +81,14 @@ def load_messages(input_path: Path, output_path: Path) -> dict[str, list[Message
 
         # 读取待翻译的文本
         with open(message_abspath, encoding="utf-8") as f:
-            messages[str(message_path)] = [
+            file_messages = [
                 Message.from_input(message, index)
                 for index, message in enumerate(json.load(f))
                 if index not in messages_translated
             ]
-    
+        
+        # 滤除不需要翻译的文件
+        if file_messages:
+            messages[str(message_path)] = file_messages
+
     return messages

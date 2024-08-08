@@ -130,6 +130,7 @@ class SakuraLLMTranslator(BaseTranslator):
                     async with self.client.stream("POST", f"{self.api}/v1/chat/completions", json=data) as response:
                         if response.status_code != 200:
                             log(self.name, f"不正常的响应({response.status_code}): {await response.aread()}")
+                            await sleep(1)
                             continue
 
                         async for line in response.aiter_lines():

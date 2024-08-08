@@ -102,7 +102,7 @@ async def progress_bar(
             break
 
         async with messages_lock:
-            messages_finished = len([msg for msg in messages if msg.translation])
+            messages_finished = len([msg for msg in messages if msg.translation is not None])
 
         log("Progress", f"{messages_finished}/{total} {messages_finished * 100 / total:.2f}% {filepath}; {translators_running} translator(s) running.")
         await sleep(4)
@@ -164,13 +164,29 @@ async def get_messages(
                 if len(messages_to_translate) >= n:
                     break
                 # 是否已经翻译或正在被翻译
-                elif msg.translation or msg.translating:
-                    continue
-                # 是否不支持该文本
-                elif msg.index in exclude:
+                elif (msg.translation is not None) or msg.translating:
                     continue
                 # 队列中是否存在完全相同的翻译
                 elif (msg.source, msg.original_speaker) in {(msg.source, msg.original_speaker) for msg in messages_to_translate}:
+                    continue
+                # 是否为空
+                elif msg.source == "":
+                    msg.translation = ""
+
+                    # 查找相同说话的人的文本
+                    if msg.original_speaker:
+                        for translated_message in messages:
+                            if translated_message.original_speaker == msg.original_speaker:
+                                msg.speaker_translation = translated_message.speaker_translation
+                                msg.translate_by = translated_message.translate_by
+                                continue
+                    else:
+                        msg.speaker_translation = msg.original_speaker
+                        msg.translate_by = None
+                        continue
+
+                # 是否不支持该文本
+                elif msg.index in exclude:
                     continue
                 # 是否已有缓存
                 async with cache_lock:
