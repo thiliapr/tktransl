@@ -91,7 +91,6 @@ class BaseTranslator:
 
 async def progress_bar(
     filepath: str,
-    total: int,
     messages: list[Message],
     messages_lock: Lock,
     running_translators: set[BaseTranslator]
@@ -102,9 +101,12 @@ async def progress_bar(
             break
 
         async with messages_lock:
-            messages_finished = len([msg for msg in messages if msg.translation is not None])
+            messages_finished = [msg for msg in messages if msg.translation is not None]
 
-        log("Progress", f"{messages_finished}/{total} {messages_finished * 100 / total:.2f}% {filepath}; {translators_running} translator(s) running.")
+            chars_total = [char for msg in messages for char in msg.source]
+            chars_finished = [char for msg in messages_finished for char in msg.source]
+
+            log("Progress", f"{len(chars_finished)}/{len(chars_total)} Character(s) {len(chars_finished) * 100 / len(chars_total):.2f}; {len(messages_finished)}/{len(messages)} Message(s) {len(messages_finished) * 100 / len(messages):.2f}%; {filepath}")
         await sleep(4)
 
 
@@ -138,7 +140,7 @@ async def translate_async(
         running_translators.add(task)
         task.add_done_callback(running_translators.discard)
 
-    await progress_bar(filepath, len(messages), messages, messages_lock, running_translators)
+    await progress_bar(filepath, messages, messages_lock, running_translators)
 
 
 # 翻译器用
