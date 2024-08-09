@@ -13,10 +13,8 @@ from utils.translate import BaseTranslator, Message, get_messages
 
 
 class SakuraLLMTranslator(BaseTranslator):
-    Sakura10SystemPrompt = "你是一个轻小说翻译模型，可以流畅通顺地使用给定的术语表以日本轻小说的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的代词，也不要擅自增加或减少换行。"
-    Sakura10TranslatePrompt = "根据以下术语表（可以为空）：\n{glossary}\n将下面的日文文本根据上述术语表的对应关系和备注翻译成中文：{input}"
-    GalTranslSystemPrompt = "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的代词，也不要擅自增加或减少换行。"
-    GalTranslTranslatePrompt = "根据以下术语表（可以为空，格式为src->dst #备注）：\n{glossary}\n联系历史剧情和上下文，根据上述术语表的对应关系和备注，以{style}的风格从日文到简体中文翻译下面的文本：\n{input}\n*EOF*\n{style}风格简体中文翻译结果："
+    GalTranslSystemPrompt = "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。"
+    GalTranslTranslatePrompt = "参考以下术语表（可为空，格式为src->dst #备注）：\n{glossary}\n根据上述术语表的对应关系和备注，结合历史剧情和上下文，以{style}的风格将下面的文本从日文翻译成简体中文：\n{input}"
 
     def __init__(
         self,
@@ -35,14 +33,11 @@ class SakuraLLMTranslator(BaseTranslator):
         self.model = model
 
         # 构造prompt
-        if model == "sakura-10":
-            self.system_prompt = SakuraLLMTranslator.Sakura10SystemPrompt
-            self.translate_prompt = SakuraLLMTranslator.Sakura10TranslatePrompt
-        elif model == "galtransl-v1.5":
+        if model == "galtransl-v2":
             self.system_prompt = SakuraLLMTranslator.GalTranslSystemPrompt
             self.translate_prompt = SakuraLLMTranslator.GalTranslTranslatePrompt
         else:
-            log(self.name, f"提供了不支持的模型: {model}。将会当作galtransl-v1.5处理。", LogLevel.Warning)
+            log(self.name, f"提供了不支持的模型: {model}。将会当作galtransl-v2处理。", LogLevel.Warning)
             self.system_prompt = SakuraLLMTranslator.GalTranslSystemPrompt
             self.translate_prompt = SakuraLLMTranslator.GalTranslTranslatePrompt
 
@@ -116,7 +111,7 @@ class SakuraLLMTranslator(BaseTranslator):
                         }
                     ],
                     "stream": True,
-                    "temperature": 0.1618,
+                    "temperature": 0.3,
                     "top_p": 0.8,
                     "presence_penalty": 0,
                     "frequency_penalty": frequency_penalty
@@ -157,7 +152,7 @@ class SakuraLLMTranslator(BaseTranslator):
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
-                                    log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。目前的frequency_penalty: {frequency_penalty}")
+                                    log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。")
                                     frequency_penalty += 0.1
                                     error = 1
                                 elif len(messages_to_translate) >= 2:
@@ -187,6 +182,22 @@ class SakuraLLMTranslator(BaseTranslator):
                             if len(loss) > 1:
                                 for i in range(len(loss) - 1):
                                     if loss[i + 1] - loss[i] != 1:
+                                        if loss[0] == 0:
+                                            if len(messages_to_translate) > 1:
+                                                log(self.name, f"检测到缺少文本结束标志, 对半拆分重试。")
+                                                async with messages_lock:
+                                                    for msg in messages_to_translate[:len(messages_to_translate) // 2]:
+                                                        msg.translating = False
+                                                        messages_to_translate.remove(msg)
+                                                error = 1
+                                            else:
+                                                log(self.name, f"检测到缺少文本结束标志, 正在跳过该文本。")
+                                                async with messages_lock:
+                                                    excluded_messages.add(messages_to_translate[0].index)
+                                                    messages_to_translate[0].translating = False
+                                                error = 2
+                                            break
+
                                         log(self.name, f"检测到缺少文本结束标志。删减翻译至第{loss[0] - 1}条文本。")
                                         split_at = loss[0]
 
@@ -205,12 +216,19 @@ class SakuraLLMTranslator(BaseTranslator):
 
                             # 是否翻译了多出了文本
                             elif len(loss) == 0:
-                                log(self.name, f"检测到翻译了太多的文本, 对半拆分重试。")
-                                async with messages_lock:
-                                    for msg in messages_to_translate[:len(messages_to_translate) // 2]:
-                                        msg.translating = False
-                                        messages_to_translate.remove(msg)
-                                error = 1
+                                if len(messages_to_translate) > 1:
+                                    log(self.name, f"检测到翻译了过多的文本, 对半拆分重试。")
+                                    async with messages_lock:
+                                        for msg in messages_to_translate[:len(messages_to_translate) // 2]:
+                                            msg.translating = False
+                                            messages_to_translate.remove(msg)
+                                    error = 1
+                                else:
+                                    log(self.name, f"检测到翻译了过多的文本, 正在跳过该文本。")
+                                    async with messages_lock:
+                                        excluded_messages.add(messages_to_translate[0].index)
+                                        messages_to_translate[0].translating = False
+                                    error = 2
 
                             # 是否发生错误
                             if error:

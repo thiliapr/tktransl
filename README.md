@@ -107,14 +107,14 @@ python tktransl.py --input proj/input/ --output proj/output/ --config proj/confi
         "previous_lines": 2,
         "next_lines": 1,
 
-        // galtransl-v1.5专有。翻译风格，可以是“文艺”或者“流畅”。
+        // SakuraLLM专有。翻译风格，可以是“文艺”或者“流畅”。
         "style": "文艺",
 
         // SakuraLLM专有。一次翻译多少行
         "number_per_request_translate": 7,
 
-        // SakuraLLM专有。支持的模型有`galtransl-v1.5`, `sakura-010`
-        "model": "galtransl-v1.5"
+        // SakuraLLM专有。支持的模型有`galtransl-v2`
+        "model": "galtransl-v2"
     },
     "translators": {
         "sakurallm": [
