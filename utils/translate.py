@@ -97,7 +97,7 @@ async def progress_bar(
 ):
     # 循环显示进度条
     while True:
-        if (translators_running := len(running_translators)) == 0:
+        if len(running_translators) == 0:
             break
 
         async with messages_lock:
@@ -106,7 +106,7 @@ async def progress_bar(
             chars_total = [char for msg in messages for char in msg.source]
             chars_finished = [char for msg in messages_finished for char in msg.source]
 
-            log("Progress", f"{len(chars_finished)}/{len(chars_total)} Character(s) {len(chars_finished) * 100 / len(chars_total):.2f}; {len(messages_finished)}/{len(messages)} Message(s) {len(messages_finished) * 100 / len(messages):.2f}%; {filepath}")
+            log("Progress", f"{len(chars_finished)}/{len(chars_total)} Character(s) {len(chars_finished) * 100 / len(chars_total):.2f}%; {len(messages_finished)}/{len(messages)} Message(s) {len(messages_finished) * 100 / len(messages):.2f}%; {filepath}")
         await sleep(4)
 
 
