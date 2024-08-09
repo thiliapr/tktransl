@@ -169,7 +169,7 @@ async def get_messages(
                 elif (msg.translation is not None) or msg.translating:
                     continue
                 # 队列中是否存在完全相同的翻译
-                elif (msg.source, msg.original_speaker) in {(msg.source, msg.original_speaker) for msg in messages_to_translate}:
+                elif (msg.source, msg.original_speaker) in {(msg.source, msg.original_speaker) for msg in messages if msg.translating}:
                     continue
                 # 是否为空
                 elif msg.source == "":
