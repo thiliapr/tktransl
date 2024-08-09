@@ -71,7 +71,6 @@ class SakuraLLMTranslator(BaseTranslator):
             frequency_penalty = 0
 
             # 一直翻译直到成功
-            fatal_flag = False
             while True:
                 # 构造批量翻译文本
                 sources = []
@@ -123,9 +122,11 @@ class SakuraLLMTranslator(BaseTranslator):
                     "frequency_penalty": frequency_penalty
                 }
 
-                # 发送请求
+                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本）
                 resp = ""
+                error = 0
 
+                # 发送请求
                 try:
                     async with self.client.stream("POST", f"{self.api}/v1/chat/completions", json=data) as response:
                         if response.status_code != 200:
@@ -152,50 +153,46 @@ class SakuraLLMTranslator(BaseTranslator):
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
-                                    frequency_penalty += 0.1
                                     log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。目前的frequency_penalty: {frequency_penalty}")
-    
-                                    resp = None
+                                    frequency_penalty += 0.1
+                                    error = 1
                                 elif len(messages_to_translate) >= 2:
                                     log(self.name, f"检测到退化发生(重复或译文过长), 对半拆分重试。")
-
-                                    # frequency_penalty归零，对半拆分重试
                                     frequency_penalty = 0
-
                                     async with messages_lock:
                                         for msg in messages_to_translate[:len(messages_to_translate) // 2]:
                                             msg.translating = False
                                             messages_to_translate.remove(msg)
-                                    resp = None
-                                else:
-                                    log(self.name, f"翻译`{sources}`时失败。", level=LogLevel.Error)
 
+                                    error = 1
+                                else:
                                     # 没法拆分了
+                                    log(self.name, f"翻译`{sources}`时失败。", level=LogLevel.Error)
                                     async with messages_lock:
                                         excluded_messages.add(messages_to_translate[0].index)
                                         messages_to_translate[0].translating = False
 
-                                    fatal_flag = True
+                                    error = 2
 
+                            # 是否发生错误
+                            if error:
                                 break
                 except (HTTPError, RuntimeError) as e:
                     log(self.name, f"请求翻译时发生了错误: {repr(e)}", level=LogLevel.Warning)
                     await sleep(3)
                     continue
 
-                if resp:
-                    # 一切正常，或者无法翻译
+                # 一切正常，或者无法翻译
+                if error == 0 or error == 2:
                     break
 
-            if fatal_flag:
-                break
-            elif resp is None:
+            # 无法翻译
+            if error == 2:
                 continue
 
             # 删除上文
             if "<PreviousEnd>" in resp:
-                resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):]
-            resp = resp.strip()
+                resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):].removeprefix("\n")
 
             # 还原
             next = resp
@@ -234,11 +231,11 @@ class SakuraLLMTranslator(BaseTranslator):
 
                     # 显示翻译
                     if msg.original_speaker:
-                        log(self.name, f"Src: {msg.original_speaker}「{msg.source}」", level=LogLevel.Debug)
-                        log(self.name, f"Dst: {msg.speaker_translation}「{msg.translation}」", level=LogLevel.Debug)
+                        log(self.name, f"Source: {msg.original_speaker}「{msg.source}」", level=LogLevel.Debug)
+                        log(self.name, f"  Dest: {msg.speaker_translation}「{msg.translation}」", level=LogLevel.Debug)
                     else:
-                        log(self.name, f"Src: {msg.source}", level=LogLevel.Debug)
-                        log(self.name, f"Dst: {msg.translation}", level=LogLevel.Debug)
+                        log(self.name, f"Source: {msg.source}", level=LogLevel.Debug)
+                        log(self.name, f"  Dest: {msg.translation}", level=LogLevel.Debug)
 
     
     @staticmethod
