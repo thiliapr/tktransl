@@ -45,7 +45,7 @@ class SakuraLLMTranslator(BaseTranslator):
             log(self.name, f"提供了不支持的模型: {model}。将会当作galtransl-v1.5处理。", LogLevel.Warning)
             self.system_prompt = SakuraLLMTranslator.GalTranslSystemPrompt
             self.translate_prompt = SakuraLLMTranslator.GalTranslTranslatePrompt
-        
+
         # 初始化客户端
         self.client = AsyncClient(timeout=timeout)
 
@@ -122,7 +122,7 @@ class SakuraLLMTranslator(BaseTranslator):
                     "frequency_penalty": frequency_penalty
                 }
 
-                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本）
+                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本，3代表提前结束翻译）
                 resp = ""
                 error = 0
 
@@ -145,10 +145,14 @@ class SakuraLLMTranslator(BaseTranslator):
 
                             resp += answer["choices"][0]["delta"]["content"]
 
+                            # 删除上文
+                            if "<PreviousEnd>" in resp:
+                                resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):].removeprefix("\n")
+
                             # 提前结束翻译（不翻译下文）
                             if "<NextBegin>" in resp:
                                 resp = resp[:resp.find("<NextBegin>")]
-                                break
+                                error = 3
 
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
@@ -174,6 +178,40 @@ class SakuraLLMTranslator(BaseTranslator):
 
                                     error = 2
 
+                            # 检测是否缺失文本结束标志
+                            loss = []
+                            for i in range(len(messages_to_translate) + 1):
+                                if f"<MSG{i}End>" not in resp:
+                                    loss.append(i)
+
+                            if len(loss) > 1:
+                                for i in range(len(loss) - 1):
+                                    if loss[i + 1] - loss[i] != 1:
+                                        log(self.name, f"检测到缺少文本结束标志。删减翻译至第{loss[0] - 1}条文本。")
+                                        split_at = loss[0]
+
+                                        # 删除文本
+                                        async with messages_lock:
+                                            for msg in messages_to_translate[split_at:]:
+                                                messages_to_translate.remove(msg)
+                                                msg.translating = False
+
+                                        # 删除响应
+                                        resp = resp[:resp.find(f"<MSG{split_at - 1}End>") + len(f"<MSG{split_at - 1}End>")]
+
+                                        # 结束翻译
+                                        error = 3
+                                        break
+
+                            # 是否翻译了多出了文本
+                            elif len(loss) == 0:
+                                log(self.name, f"检测到翻译了太多的文本, 对半拆分重试。")
+                                async with messages_lock:
+                                    for msg in messages_to_translate[:len(messages_to_translate) // 2]:
+                                        msg.translating = False
+                                        messages_to_translate.remove(msg)
+                                error = 1
+
                             # 是否发生错误
                             if error:
                                 break
@@ -182,17 +220,13 @@ class SakuraLLMTranslator(BaseTranslator):
                     await sleep(3)
                     continue
 
-                # 一切正常，或者无法翻译
-                if error == 0 or error == 2:
+                # 无法翻译、提前结束翻译
+                if error != 1:
                     break
 
             # 无法翻译
             if error == 2:
                 continue
-
-            # 删除上文
-            if "<PreviousEnd>" in resp:
-                resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):].removeprefix("\n")
 
             # 还原
             next = resp
@@ -237,7 +271,6 @@ class SakuraLLMTranslator(BaseTranslator):
                         log(self.name, f"Source: {msg.source}", level=LogLevel.Debug)
                         log(self.name, f"  Dest: {msg.translation}", level=LogLevel.Debug)
 
-    
     @staticmethod
     def check_degen(resp: str, max_repetition_cnt: int) -> bool:
         for length in range(1, len(resp) // max_repetition_cnt):
