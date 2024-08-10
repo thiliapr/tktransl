@@ -200,13 +200,13 @@ async def get_messages(
                 msg.translating = True
                 messages_to_translate.append(msg)
 
-        # 判断是否退出循环
-        if not messages_to_translate:
-            # 如果既没有文本要翻译，并且没有翻译任务未完成，就返回空列表，否则一秒后继续检测
-            if [msg for msg in messages if msg.translating]:
-                await sleep(1)
-                continue
+            # 判断是否退出循环
+            if not messages_to_translate:
+                # 如果既没有文本要翻译，并且没有翻译任务未完成，就返回空列表，否则一秒后继续检测
+                if [msg for msg in messages if msg.translating]:
+                    await sleep(1)
+                    continue
+                else:
+                    return []
             else:
-                return []
-        else:
-            return messages_to_translate
+                return messages_to_translate
