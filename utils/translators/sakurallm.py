@@ -198,7 +198,7 @@ class SakuraLLMTranslator(BaseTranslator):
                                                 error = 2
                                             break
 
-                                        log(self.name, f"检测到缺少文本结束标志。删减翻译至第{loss[0] - 1}条文本。")
+                                        log(self.name, f"检测到缺少文本结束标志。删减翻译至第{loss[0]}条文本。")
                                         split_at = loss[0]
 
                                         # 删除文本
