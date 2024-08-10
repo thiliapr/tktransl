@@ -48,6 +48,43 @@ class SakuraLLMTranslator(BaseTranslator):
         # 初始化客户端
         self.client = AsyncClient(timeout=timeout)
 
+    async def _half_messages(self, error_message: str, messages_to_translate: list[Message], messages_lock: Lock, excluded_messages: set[int]) -> bool:
+        """
+        如果要翻译的文本的数量大于1，就从要翻译的文本的列表中删除一半，并返回True; 否则，就释放当前唯一的文本，并返回False。
+        """
+
+        async with messages_lock:
+            if len(messages_to_translate) > 1:
+                log(self.name, f"{error_message}, 对半拆分重试。")
+                for msg in messages_to_translate[:len(messages_to_translate) // 2]:
+                    msg.translating = False
+                    messages_to_translate.remove(msg)
+                return True
+            else:
+                log(self.name, f"{error_message}, 翻译器将不会翻译该文本。", level=LogLevel.Warning)
+                excluded_messages.add(messages_to_translate[0].index)
+                messages_to_translate[0].translating = False
+                return False
+
+    @staticmethod
+    def check_degen(resp: str, max_repetition_cnt: int) -> bool:
+        for length in range(1, len(resp) // max_repetition_cnt):
+            txt = resp[-length:]
+            start = repetition_cnt = 0
+
+            while start < len(resp):
+                if resp[start:].startswith(txt):
+                    repetition_cnt += 1
+                    start += len(txt)
+                else:
+                    repetition_cnt = 0
+                    start += 1
+
+                if repetition_cnt >= max_repetition_cnt:
+                    return True
+
+        return False
+
     async def batch_translate(
         self,
         messages: list[Message],
@@ -82,18 +119,19 @@ class SakuraLLMTranslator(BaseTranslator):
 
                     # 对说话的人进行处理
                     if msg.original_speaker:
+                        source = source.replace("「", "“").replace("」", "”")
                         source = f"{msg.original_speaker}「{source}」"
 
-                    sources.append(f"{escape(source)}<MSG{index}End>")
+                    sources.append(f"{escape(source)}")
                 sources = "\n".join(sources)
 
                 # 连接上下文
                 previous = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
                 next = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[messages.index(messages_to_translate[-1]) + 1:]]).splitlines()[:self.next_lines]))
                 sources = "\n".join([
-                    f"{previous}<PreviousEnd>",
+                    previous if previous else "没有上文",
                     sources,
-                    f"<NextBegin>{next}"
+                    next if next else "没有下文"
                 ])
 
                 # 获取最大允许重复次数
@@ -144,115 +182,55 @@ class SakuraLLMTranslator(BaseTranslator):
 
                             resp += answer["choices"][0]["delta"]["content"]
 
-                            # 删除上文
-                            if "<PreviousEnd>" in resp:
-                                resp = resp[resp.find("<PreviousEnd>") + len("<PreviousEnd>"):].removeprefix("\n")
-
-                            # 提前结束翻译（不翻译下文）
-                            if "<NextBegin>" in resp:
-                                resp = resp[:resp.find("<NextBegin>")]
-                                error = 3
-
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
                                     log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。")
                                     frequency_penalty += 0.1
                                     error = 1
-                                elif len(messages_to_translate) >= 2:
-                                    log(self.name, f"检测到退化发生(重复或译文过长), 对半拆分重试。")
+                                else:
                                     frequency_penalty = 0
-                                    async with messages_lock:
-                                        for msg in messages_to_translate[:len(messages_to_translate) // 2]:
-                                            msg.translating = False
-                                            messages_to_translate.remove(msg)
+                                    error = 1 if await self._half_messages("检测到退化发生(重复或译文过长)", messages_to_translate, messages_lock, excluded_messages) else 2
+                            # 检测行数是否超过了原文
+                            elif len(resp.splitlines()) > len(sources.splitlines()):
+                                error = 1 if await self._half_messages(f"翻译行数大于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
 
-                                    error = 1
-                                else:
-                                    # 没法拆分了
-                                    log(self.name, f"翻译`{sources}`时失败。", level=LogLevel.Error)
-                                    async with messages_lock:
-                                        excluded_messages.add(messages_to_translate[0].index)
-                                        messages_to_translate[0].translating = False
-
-                                    error = 2
-
-                            # 检测是否缺失文本结束标志
-                            loss = []
-                            for i in range(len(messages_to_translate) + 1):
-                                if f"<MSG{i}End>" not in resp:
-                                    loss.append(i)
-
-                            if len(loss) > 1:
-                                for i in range(len(loss) - 1):
-                                    if loss[i + 1] - loss[i] != 1:
-                                        if loss[0] == 0:
-                                            if len(messages_to_translate) > 1:
-                                                log(self.name, f"检测到缺少文本结束标志, 对半拆分重试。")
-                                                async with messages_lock:
-                                                    for msg in messages_to_translate[:len(messages_to_translate) // 2]:
-                                                        msg.translating = False
-                                                        messages_to_translate.remove(msg)
-                                                error = 1
-                                            else:
-                                                log(self.name, f"检测到缺少文本结束标志, 正在跳过该文本。")
-                                                async with messages_lock:
-                                                    excluded_messages.add(messages_to_translate[0].index)
-                                                    messages_to_translate[0].translating = False
-                                                error = 2
-                                            break
-
-                                        log(self.name, f"检测到缺少文本结束标志。删减翻译至第{loss[0]}条文本。")
-                                        split_at = loss[0]
-
-                                        # 删除文本
-                                        async with messages_lock:
-                                            for msg in messages_to_translate[split_at:]:
-                                                messages_to_translate.remove(msg)
-                                                msg.translating = False
-
-                                        # 删除响应
-                                        resp = resp[:resp.find(f"<MSG{split_at - 1}End>") + len(f"<MSG{split_at - 1}End>")]
-
-                                        # 结束翻译
-                                        error = 3
+                            # 检测是否存在空行
+                            if not error:
+                                for index, line in enumerate(resp.removesuffix("\n").splitlines()):
+                                    if not line:
+                                        error = 1 if await self._half_messages(f"第{index + 1}行为空", messages_to_translate, messages_lock, excluded_messages) else 2
                                         break
-
-                            # 是否翻译了多出了文本
-                            elif len(loss) == 0:
-                                if len(messages_to_translate) > 1:
-                                    log(self.name, f"检测到翻译了过多的文本, 对半拆分重试。")
-                                    async with messages_lock:
-                                        for msg in messages_to_translate[:len(messages_to_translate) // 2]:
-                                            msg.translating = False
-                                            messages_to_translate.remove(msg)
-                                    error = 1
-                                else:
-                                    log(self.name, f"检测到翻译了过多的文本, 正在跳过该文本。")
-                                    async with messages_lock:
-                                        excluded_messages.add(messages_to_translate[0].index)
-                                        messages_to_translate[0].translating = False
-                                    error = 2
 
                             # 是否发生错误
                             if error:
                                 break
                 except (HTTPError, RuntimeError) as e:
                     if self.restart_api:
-                        log(self.name, f"请求翻译时发生了错误, 正在尝试重启服务器: {repr(e)}", level=LogLevel.Info)
+                        log(self.name, f"请求翻译时发生了错误, 正在尝试重启服务器: {repr(e)}")
                         try:
                             response = await self.client.post(self.restart_api)
                             if response.content != b"ok":
                                 raise RuntimeError(f"不正常的响应({response.status_code}): {response.content}")
-                            else:
-                                continue
+                            error = 1
                         except (HTTPError, RuntimeError) as ex:
                             log(self.name, f"重启服务器时发生了错误: {repr(ex)}", level=LogLevel.Error)
                             error = 4
                     else:
-                        log(self.name, f"请求翻译时发生了错误, 等待3秒后重试: {repr(e)}", level=LogLevel.Info)
+                        log(self.name, f"请求翻译时发生了错误, 等待3秒后重试: {repr(e)}")
                         await sleep(3)
-                        continue
+                        error = 1
+
+                # 检测是否翻译行数是否小于原文行数
+                if not error and len(resp.splitlines()) < len(sources.splitlines()):
+                    error = 1 if await self._half_messages(f"翻译行数小于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
+
+                # 结束时再检测一次是否存在空行
+                if not error:
+                    for index, line in enumerate(resp.splitlines()):
+                        if not line:
+                            error = 1 if await self._half_messages(f"第{index + 1}行为空", messages_to_translate, messages_lock, excluded_messages) else 2
+                            break
 
                 # 无法翻译、提前结束翻译
                 if error != 1:
@@ -265,17 +243,20 @@ class SakuraLLMTranslator(BaseTranslator):
             elif error == 4:
                 break
 
+            # 删除上、下文
+            resp = "\n".join(resp.splitlines()[1:-1])
+
             # 还原
-            next = resp
+            destinations = resp.splitlines()
             async with messages_lock:
                 for index, msg in enumerate(messages_to_translate):
-                    content = next[:next.find(f"<MSG{index}End>")]
-                    next = next[next.find(f"<MSG{index}End>") + len(f"<MSG{index}End>"):].removeprefix("\n")
+                    content = destinations[index]
 
                     # 还原说话的人
                     if msg.original_speaker:
                         if "「" in content:
                             speaker, content = content.split("「", 1)
+                            content = content.replace("“", "「").replace("”", "」")
                         else:
                             speaker = msg.original_speaker
                         content = content.removesuffix("」")
@@ -307,22 +288,3 @@ class SakuraLLMTranslator(BaseTranslator):
                     else:
                         log(self.name, f"Source: {msg.source}", level=LogLevel.Debug)
                         log(self.name, f"  Dest: {msg.translation}", level=LogLevel.Debug)
-
-    @staticmethod
-    def check_degen(resp: str, max_repetition_cnt: int) -> bool:
-        for length in range(1, len(resp) // max_repetition_cnt):
-            txt = resp[-length:]
-            start = repetition_cnt = 0
-
-            while start < len(resp):
-                if resp[start:].startswith(txt):
-                    repetition_cnt += 1
-                    start += len(txt)
-                else:
-                    repetition_cnt = 0
-                    start += 1
-
-                if repetition_cnt >= max_repetition_cnt:
-                    return True
-
-        return False

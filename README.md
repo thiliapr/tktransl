@@ -10,8 +10,8 @@ TkTransl 是自由软件：你可以再分发之和/或依照由[自由软件基
 ## 用法
 
 ```shell
-# 安装依赖
-pip install -r requirements.txt
+# 安装SakuraLLM翻译器的依赖（不用它是不需要安装的）
+pip install -r requirements.sakurallm.txt
 
 # 翻译
 python tktransl.py \
@@ -136,6 +136,10 @@ python tktransl.py \
                 // OpenAI格式的API、时间限制（单位：秒）。
                 "api": "http://127.0.0.1:10086", 
                 "timeout": 5,
+
+                // 可选。重启服务器的API、时间限制（单位：秒）。
+                "restart_api": "http://127.0.0.1:14514/10086",
+                "restart_timeout": 60
             }
         ]
     }
