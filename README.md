@@ -19,15 +19,15 @@ python tktransl.py --input proj/input/ --output proj/output/ --config proj/confi
 
 ### 参数说明
 
-`--input`: 必选。要翻译的文件。
-`--output`: 必选。翻译的输出路径。
-`--config`: 必选。配置文件。
-`--pre-dict`: 多选。译前（预处理）词典文件。
-`--post-dict`: 多选。译后词典文件。
-`--not-allowed-logging-level`: 多选。不允许某个等级的日志输出。等级: [Debug, Info, Warning, Error, Fatal]。
-`--builtin-pre-dict`: 建议。使用内置的译前词典。
-`--builtin-post-dict`: 建议。使用内置的译后词典。
-`--builtin-gpt-dict`: 建议。使用内置的GPT词典。
+`--input`: 必选。要翻译的文件。  
+`--output`: 必选。翻译的输出路径。  
+`--config`: 必选。配置文件。  
+`--pre-dict`: 多选。译前（预处理）词典文件。  
+`--post-dict`: 多选。译后词典文件。  
+`--not-allowed-logging-level`: 多选。不允许某个等级的日志输出。等级: [Debug, Info, Warning, Error, Fatal]。  
+`--builtin-pre-dict`: 建议。使用内置的译前词典。  
+`--builtin-post-dict`: 建议。使用内置的译后词典。  
+`--builtin-gpt-dict`: 建议。使用内置的GPT词典。  
 
 ## 文本
 
