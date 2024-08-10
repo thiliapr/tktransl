@@ -14,7 +14,16 @@ TkTransl 是自由软件：你可以再分发之和/或依照由[自由软件基
 pip install -r requirements.txt
 
 # 翻译
-python tktransl.py --input proj/input/ --output proj/output/ --config proj/config.json --pre-dict proj/preDict.txt --post-dict proj/postDict.txt --gpt-dict proj/gptDict.txt
+python tktransl.py \
+    --input proj/input/ \
+    --output proj/output/ \
+    --config proj/config.json \
+    --pre-dict proj/preDict.txt \
+    --post-dict proj/postDict.txt \
+    --gpt-dict proj/gptDict.txt \
+    --builtin-pre-dict \
+    --builtin-post-dict \
+    --builtin-gpt-dict
 ```
 
 ### 参数说明
@@ -22,8 +31,9 @@ python tktransl.py --input proj/input/ --output proj/output/ --config proj/confi
 `--input`: 必选。要翻译的文件。  
 `--output`: 必选。翻译的输出路径。  
 `--config`: 必选。配置文件。  
-`--pre-dict`: 多选。译前（预处理）词典文件。  
-`--post-dict`: 多选。译后词典文件。  
+`--pre-dict`: 多选。译前（预处理）词典。  
+`--post-dict`: 多选。译后词典。  
+`--gpt-dict`: 多选。GPT词典（用于大语言模型的词典）。  
 `--not-allowed-logging-level`: 多选。不允许某个等级的日志输出。等级: [Debug, Info, Warning, Error, Fatal]。  
 `--builtin-pre-dict`: 建议。使用内置的译前词典。  
 `--builtin-post-dict`: 建议。使用内置的译后词典。  
