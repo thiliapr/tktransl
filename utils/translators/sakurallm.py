@@ -22,7 +22,9 @@ class SakuraLLMTranslator(BaseTranslator):
         model: str,
         api: str,
         timeout: int | float,
-        style: str = "文艺",
+        style: str,
+        restart_api: Optional[str] = None,
+        restart_timeout: int | float = 60,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -31,6 +33,8 @@ class SakuraLLMTranslator(BaseTranslator):
         self.number_per_request_translate = number_per_request_translate
         self.api = api.removesuffix("/")
         self.model = model
+        self.restart_api = restart_api
+        self.restart_timeout = restart_timeout
 
         # 构造prompt
         if model == "galtransl-v2":
@@ -117,7 +121,7 @@ class SakuraLLMTranslator(BaseTranslator):
                     "frequency_penalty": frequency_penalty
                 }
 
-                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本，3代表提前结束翻译）
+                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本，3代表提前结束翻译, 4代表致命错误）
                 resp = ""
                 error = 0
 
@@ -234,9 +238,21 @@ class SakuraLLMTranslator(BaseTranslator):
                             if error:
                                 break
                 except (HTTPError, RuntimeError) as e:
-                    log(self.name, f"请求翻译时发生了错误: {repr(e)}", level=LogLevel.Warning)
-                    await sleep(3)
-                    continue
+                    if self.restart_api:
+                        log(self.name, f"请求翻译时发生了错误, 正在尝试重启服务器: {repr(e)}", level=LogLevel.Info)
+                        try:
+                            response = await self.client.post(self.restart_api)
+                            if response.content != b"ok":
+                                raise RuntimeError(f"不正常的响应({response.status_code}): {response.content}")
+                            else:
+                                continue
+                        except (HTTPError, RuntimeError) as ex:
+                            log(self.name, f"重启服务器时发生了错误: {repr(ex)}", level=LogLevel.Error)
+                            error = 4
+                    else:
+                        log(self.name, f"请求翻译时发生了错误, 等待3秒后重试: {repr(e)}", level=LogLevel.Info)
+                        await sleep(3)
+                        continue
 
                 # 无法翻译、提前结束翻译
                 if error != 1:
@@ -245,6 +261,9 @@ class SakuraLLMTranslator(BaseTranslator):
             # 无法翻译
             if error == 2:
                 continue
+            # 致命错误
+            elif error == 4:
+                break
 
             # 还原
             next = resp
