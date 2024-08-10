@@ -14,7 +14,7 @@ TkTransl 是自由软件：你可以再分发之和/或依照由[自由软件基
 pip install -r requirements.txt
 
 # 翻译
-python tktransl.py --input proj/input/ --output proj/output/ --config proj/config.json --pre-dict proj/preDict.txt --post-dict proj/postDict.txt --gpt-dict proj/gptDict.txt --not-allowed-log-level Log
+python tktransl.py --input proj/input/ --output proj/output/ --config proj/config.json --pre-dict proj/preDict.txt --post-dict proj/postDict.txt --gpt-dict proj/gptDict.txt
 ```
 
 ### 参数说明
