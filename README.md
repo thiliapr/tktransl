@@ -117,19 +117,19 @@ python tktransl.py \
         "previous_lines": 2,
         "next_lines": 1,
 
-        // SakuraLLM专有。翻译风格，可以是“文艺”或者“流畅”。
+        // 翻译风格，可以是“文艺”或者“流畅”。
         "style": "文艺",
 
-        // SakuraLLM专有。一次翻译多少行
+        // 一次翻译多少行
         "number_per_request_translate": 7,
 
-        // SakuraLLM专有。支持的模型有`galtransl-v2`
+        // 支持的模型有`galtransl-v2`
         "model": "galtransl-v2"
     },
     "translators": {
         "sakurallm": [
             {
-                // 翻译器的名称。记录日志时会显示此名称。
+                // 通用设置。翻译器的名称。记录日志时会显示此名称。
                 "name": "SakuraLLM-1",
 
                 // 以下皆为SakuraLLM专有。

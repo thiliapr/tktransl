@@ -50,7 +50,7 @@ class SakuraLLMTranslator(BaseTranslator):
 
     async def _half_messages(self, error_message: str, messages_to_translate: list[Message], messages_lock: Lock, excluded_messages: set[int]) -> bool:
         """
-        如果要翻译的文本的数量大于1，就从要翻译的文本的列表中删除一半，并返回True; 否则，就释放当前唯一的文本，并返回False。
+        如果要翻译的文本的数量大于1, 就从要翻译的文本的列表中删除一半, 并返回True; 否则, 就释放当前唯一的文本, 并返回False。
         """
 
         async with messages_lock:

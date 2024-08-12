@@ -47,7 +47,7 @@ def unescape(msg: str) -> str:
             escape = True
         else:
             src += char
-    
+
     return src
 
 

@@ -16,10 +16,7 @@ def load_dicts(paths: tuple[list[Path], list[Path], list[Path]]) -> tuple[list[t
     加载字典。
 
     Args:
-        paths(tuple):
-            list[Path]: 译前词典。
-            list[Path]: 译后词典。
-            list[Path]: GPT词典。
+        paths(tuple[list[Path] * 3]): 3个含有`Path`对象的列表，分别是译前词典、译后词典以及GPT词典的路径。
 
     Returns:
         list[tuple[原文, 译文]]: 译前词典。
