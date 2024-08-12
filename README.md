@@ -10,7 +10,7 @@ TkTransl 是自由软件：你可以再分发之和/或依照由[自由软件基
 ## 用法
 
 ```shell
-# 安装SakuraLLM翻译器的依赖（不用它是不需要安装的）
+# 安装依赖
 pip install -r requirements.sakurallm.txt
 
 # 翻译
