@@ -4,6 +4,10 @@
 # 发布 TkTransl 是希望它能有用，但是并无保障;甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
+"""
+SakuraLLM翻译器。
+"""
+
 from asyncio import Lock, sleep
 import json
 from typing import Optional
@@ -13,6 +17,10 @@ from utils.translate import BaseTranslator, Message, get_messages
 
 
 class SakuraLLMTranslator(BaseTranslator):
+    """
+    使用SakuraLLM作为引擎的翻译器类。
+    """
+
     GalTranslSystemPrompt = "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。"
     GalTranslTranslatePrompt = "参考以下术语表（可为空，格式为src->dst #备注）：\n{glossary}\n根据上述术语表的对应关系和备注，结合历史剧情和上下文，以{style}的风格将下面的文本从日文翻译成简体中文：\n{input}"
 
@@ -68,6 +76,10 @@ class SakuraLLMTranslator(BaseTranslator):
 
     @staticmethod
     def check_degen(resp: str, max_repetition_cnt: int) -> bool:
+        """
+        检查文本内是否存在超过`max_repetition_cnt`个重复文本。
+        """
+
         for length in range(1, len(resp) // max_repetition_cnt):
             txt = resp[-length:]
             start = repetition_cnt = 0
@@ -93,6 +105,10 @@ class SakuraLLMTranslator(BaseTranslator):
         cache: dict[tuple[str, Optional[str]], tuple[str, Optional[str], str]],
         cache_lock: Lock
     ):
+        """
+        启动一个翻译协程。
+        """
+
         # 初始化变量
         excluded_messages: set[int] = set()
 
@@ -126,12 +142,12 @@ class SakuraLLMTranslator(BaseTranslator):
                 sources = "\n".join(sources)
 
                 # 连接上下文
-                previous = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
-                next = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[messages.index(messages_to_translate[-1]) + 1:]]).splitlines()[:self.next_lines]))
+                previous_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
+                next_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[messages.index(messages_to_translate[-1]) + 1:]]).splitlines()[:self.next_lines]))
                 sources = "\n".join([
-                    previous if previous else "没有上文",
+                    previous_content if previous_content else "没有上文",
                     sources,
-                    next if next else "没有下文"
+                    next_content if next_content else "没有下文"
                 ])
 
                 # 获取最大允许重复次数
@@ -159,7 +175,7 @@ class SakuraLLMTranslator(BaseTranslator):
                     "frequency_penalty": frequency_penalty
                 }
 
-                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本，3代表提前结束翻译, 4代表致命错误）
+                # 初始化变量: 接受的译文、错误标志（0代表无错误, 1代表可以通过重新翻译解决, 2代表需要跳过这些文本，3代表致命错误）
                 resp = ""
                 error = 0
 
@@ -185,7 +201,7 @@ class SakuraLLMTranslator(BaseTranslator):
                             # 检测是否退化
                             if SakuraLLMTranslator.check_degen(resp, max_repetition_cnt) or (len(resp) / len(sources) > 1.5):
                                 if frequency_penalty < 0.8:
-                                    log(self.name, f"检测到退化发生(重复或译文过长), 增加frequency_penalty重试。")
+                                    log(self.name, "检测到退化发生(重复或译文过长), 增加frequency_penalty重试。")
                                     frequency_penalty += 0.1
                                     error = 1
                                 else:
@@ -193,7 +209,7 @@ class SakuraLLMTranslator(BaseTranslator):
                                     error = 1 if await self._half_messages("检测到退化发生(重复或译文过长)", messages_to_translate, messages_lock, excluded_messages) else 2
                             # 检测行数是否超过了原文
                             elif len(resp.splitlines()) > len(sources.splitlines()):
-                                error = 1 if await self._half_messages(f"翻译行数大于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
+                                error = 1 if await self._half_messages("翻译行数大于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
 
                             # 检测是否存在空行
                             if not error:
@@ -211,11 +227,13 @@ class SakuraLLMTranslator(BaseTranslator):
                         try:
                             response = await self.client.post(self.restart_api)
                             if response.content != b"ok":
-                                raise RuntimeError(f"不正常的响应({response.status_code}): {response.content}")
-                            error = 1
+                                log(self.name, f"重启服务器时返回了不正常的响应({response.status_code}): {response.content}", level=LogLevel.Error)
+                                error = 3
+                            else:
+                                error = 1
                         except (HTTPError, RuntimeError) as ex:
                             log(self.name, f"重启服务器时发生了错误: {repr(ex)}", level=LogLevel.Error)
-                            error = 4
+                            error = 3
                     else:
                         log(self.name, f"请求翻译时发生了错误, 等待3秒后重试: {repr(e)}")
                         await sleep(3)
@@ -223,7 +241,7 @@ class SakuraLLMTranslator(BaseTranslator):
 
                 # 检测是否翻译行数是否小于原文行数
                 if not error and len(resp.splitlines()) < len(sources.splitlines()):
-                    error = 1 if await self._half_messages(f"翻译行数小于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
+                    error = 1 if await self._half_messages("翻译行数小于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
 
                 # 结束时再检测一次是否存在空行
                 if not error:
@@ -232,7 +250,7 @@ class SakuraLLMTranslator(BaseTranslator):
                             error = 1 if await self._half_messages(f"第{index + 1}行为空", messages_to_translate, messages_lock, excluded_messages) else 2
                             break
 
-                # 无法翻译、提前结束翻译
+                # 无法翻译、致命错误
                 if error != 1:
                     break
 
@@ -240,7 +258,7 @@ class SakuraLLMTranslator(BaseTranslator):
             if error == 2:
                 continue
             # 致命错误
-            elif error == 4:
+            elif error == 3:
                 break
 
             # 删除上、下文

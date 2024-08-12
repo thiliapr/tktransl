@@ -4,6 +4,10 @@
 # 发布 TkTransl 是希望它能有用，但是并无保障;甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
+"""
+提供加载相关操作的模块。
+"""
+
 import json
 from pathlib import Path
 from typing import Optional
@@ -16,7 +20,7 @@ def load_dicts(paths: tuple[list[Path], list[Path], list[Path]]) -> tuple[list[t
     加载字典。
 
     Args:
-        paths(tuple[list[Path] * 3]): 3个含有`Path`对象的列表，分别是译前词典、译后词典以及GPT词典的路径。
+        paths(tuple[list[Path] * 3]): 3个含有`Path`对象的列表: 译前词典、译后词典以及GPT词典。
 
     Returns:
         list[tuple[原文, 译文]]: 译前词典。

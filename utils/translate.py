@@ -4,6 +4,10 @@
 # 发布 TkTransl 是希望它能有用，但是并无保障;甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
+"""
+翻译相关操作。
+"""
+
 from abc import abstractmethod
 from asyncio import Lock, create_task, sleep
 from dataclasses import dataclass
@@ -95,6 +99,10 @@ async def progress_bar(
     messages_lock: Lock,
     running_translators: set[BaseTranslator]
 ):
+    """
+    循环打印进度条到控制台。
+    """
+
     # 循环显示进度条
     while True:
         if len(running_translators) == 0:
@@ -166,13 +174,13 @@ async def get_messages(
                 if len(messages_to_translate) >= n:
                     break
                 # 是否已经翻译或正在被翻译
-                elif (msg.translation is not None) or msg.translating:
+                if (msg.translation is not None) or msg.translating:
                     continue
                 # 队列中是否存在完全相同的翻译
-                elif (msg.source, msg.original_speaker) in {(msg.source, msg.original_speaker) for msg in messages if msg.translating}:
+                if (msg.source, msg.original_speaker) in {(msg.source, msg.original_speaker) for msg in messages if msg.translating}:
                     continue
                 # 是否为空
-                elif msg.source == "":
+                if msg.source == "":
                     msg.translation = ""
 
                     # 查找相同说话的人的文本
@@ -188,7 +196,7 @@ async def get_messages(
                         continue
 
                 # 是否不支持该文本
-                elif msg.index in exclude:
+                if msg.index in exclude:
                     continue
                 # 是否已有缓存
                 async with cache_lock:
@@ -208,7 +216,6 @@ async def get_messages(
             if messages_unfinished:
                 await sleep(1)
                 continue
-            else:
-                return []
+            return []
         else:
             return messages_to_translate

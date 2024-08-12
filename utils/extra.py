@@ -4,12 +4,25 @@
 # 发布 TkTransl 是希望它能有用，但是并无保障;甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
+"""
+提供一些额外的工具。
+"""
+
 from sys import stdout, stderr
 from datetime import datetime
 from enum import Enum
 
 
 class LogLevel(Enum):
+    """
+    日志的级别。
+    - `Debug`: 调试用。
+    - `Info`: 正常信息。
+    - `Warning`: 可能不会按预期运行。
+    - `Error`: 发出此信息的模块无法继续工作。
+    - `Fatal`: 程序崩溃。
+    """
+
     Debug = "DEBUG"
     Info = "INFO"
     Warning = "WARN"
@@ -35,16 +48,16 @@ def unescape(msg: str) -> str:
 
     src = ""
 
-    escape = False
+    escaping = False
     for char in msg:
-        if escape:
+        if escaping:
             if char == "n":
                 src += "\n"
             else:
                 src += char
-            escape = False
+            escaping = False
         elif char == "\\":
-            escape = True
+            escaping = True
         else:
             src += char
 

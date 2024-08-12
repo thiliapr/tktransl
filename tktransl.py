@@ -6,8 +6,12 @@
 # 发布 TkTransl 是希望它能有用，但是并无保障;甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
-from asyncio import run
+"""
+TkTransl的程序入口。
+"""
+
 import json
+from asyncio import run
 from pathlib import Path
 from argparse import ArgumentParser
 from utils.extra import LogLevel, LogLevelsAllowed, log
@@ -17,8 +21,17 @@ from utils.translators import get_translator
 
 
 def main():
+    """
+    程序的主入口。
+    """
+
     # 显示程序信息
-    print("TkTransl  Copyright (C) 2024  thiliapr\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it under certain conditions.\nSource Code: https://github.com/thiliapr/tktransl\n")
+    print(
+        "TkTransl  Copyright (C) 2024  thiliapr\n"
+        "This program comes with ABSOLUTELY NO WARRANTY.\n"
+        "This is free software, and you are welcome to redistribute it under certain conditions.\n"
+        "Source Code: https://github.com/thiliapr/tktransl\n"
+    )
 
     # 获取资源库路径
     library_path = Path(__file__).absolute().parent / "library"
