@@ -211,11 +211,12 @@ async def get_messages(
             # 判断是否退出循环
             messages_unfinished = [msg for msg in messages if msg.translating]
 
-        if not messages_to_translate:
-            # 如果既没有文本要翻译，并且没有翻译任务未完成，就返回空列表，否则一秒后继续检测
-            if messages_unfinished:
-                await sleep(1)
-                continue
-            return []
-        else:
+        # 如果有文本要翻译，就直接返回
+        if messages_to_translate:
             return messages_to_translate
+
+        # 如果既没有文本要翻译，并且没有翻译任务未完成，就返回空列表，否则一秒后继续检测
+        if messages_unfinished:
+            await sleep(1)
+            continue
+        return []
