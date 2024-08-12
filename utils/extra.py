@@ -30,7 +30,7 @@ class LogLevel(Enum):
     Fatal = "FATAL"
 
 
-LogLevelsAllowed = {level for level in LogLevel}
+LogLevelsAllowed = set(LogLevel)
 
 
 def escape(msg: str) -> str:
