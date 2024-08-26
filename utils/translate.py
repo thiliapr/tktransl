@@ -41,9 +41,7 @@ class Message:
     translating: bool = False
 
     def jsonify(self) -> dict[str, Any]:
-        """
-        将文本对象JSON序列化。
-        """
+        "将文本对象JSON序列化。"
 
         return {k: v for k, v in {
             "index": self.index,
@@ -65,9 +63,7 @@ class Message:
 
 
 class BaseTranslator:
-    """
-    文本翻译器。
-    """
+    "文本翻译器。"
 
     def __init__(self, name: str, previous_lines: int, next_lines: int, **kwargs):
         self.name = name
@@ -86,9 +82,7 @@ class BaseTranslator:
         cache: dict[tuple[str, Optional[str]], tuple[str, Optional[str]]],
         cache_lock: Lock
     ):
-        """
-        启动一个翻译协程。
-        """
+        "启动一个翻译协程。"
 
         raise NotImplementedError
 
@@ -99,9 +93,7 @@ async def progress_bar(
     messages_lock: Lock,
     running_translators: set[BaseTranslator]
 ):
-    """
-    循环打印进度条到控制台。
-    """
+    "循环打印进度条到控制台。"
 
     # 循环显示进度条
     while True:
@@ -160,9 +152,7 @@ async def get_messages(
     cache: dict[tuple[str, Optional[str]], tuple[str, Optional[str], str]],
     cache_lock: Lock
 ) -> list[Message]:
-    """
-    从文本中取出`n`个文本, 并将它们的`translating`值设置为`True`。
-    """
+    "从文本中取出`n`个文本, 并将它们的`translating`值设置为`True`。"
 
     while True:
         async with messages_lock:

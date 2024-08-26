@@ -72,5 +72,5 @@ def log(by: str, msg: str, level: LogLevel = LogLevel.Info):
     if level in LogLevelsAllowed:
         print(
             " ".join([datetime.strftime(datetime.now(), "[%H:%M:%S]"), f"[{level.value}]", f"[{by}]:", escape(msg)]),
-            file=stderr if (level == LogLevel.Error) or (level == LogLevel.Fatal) else stdout
+            file=stderr if level in (LogLevel.Error, LogLevel.Fatal) else stdout
         )

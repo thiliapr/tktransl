@@ -10,7 +10,6 @@
 
 from utils.translate import BaseTranslator
 from utils.extra import LogLevel, log
-from utils.translators.sakurallm import SakuraLLMTranslator
 
 
 def get_translator(translator_id: str) -> type[BaseTranslator]:
@@ -19,6 +18,7 @@ def get_translator(translator_id: str) -> type[BaseTranslator]:
     """
 
     if translator_id == "sakurallm":
+        from utils.translators.sakurallm import SakuraLLMTranslator
         return SakuraLLMTranslator
 
     log("get_translator()", f"创建翻译器时发现了未知的翻译器: {translator_id}", level=LogLevel.Error)

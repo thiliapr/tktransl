@@ -129,17 +129,13 @@ class SakuraLLMTranslator(BaseTranslator):
                 for index, msg in enumerate(messages_to_translate):
                     source = msg.source
 
-                    # 译前词典操作
-                    for entry in dicts[0]:
-                        source = source.replace(entry[0], entry[1])
-
                     # 对说话的人进行处理
                     if msg.original_speaker:
                         source = source.replace("「", "“").replace("」", "”")
                         source = f"{msg.original_speaker}「{source}」"
 
                     sources.append(f"{escape(source)}")
-                sources = "\n".join(sources)
+                sources = "\n".join([msg.source for msg in messages_to_translate])
 
                 # 连接上下文
                 previous_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
@@ -149,6 +145,10 @@ class SakuraLLMTranslator(BaseTranslator):
                     sources,
                     next_content if next_content else "没有下文"
                 ])
+
+                # 译前词典操作
+                for entry in dicts[0]:
+                    sources = sources.replace(entry[0], entry[1])
 
                 # 获取最大允许重复次数
                 max_repetition_cnt = max(len(sources), 30)
@@ -258,7 +258,7 @@ class SakuraLLMTranslator(BaseTranslator):
             if error == 2:
                 continue
             # 致命错误
-            elif error == 3:
+            if error == 3:
                 break
 
             # 删除上、下文
@@ -279,7 +279,7 @@ class SakuraLLMTranslator(BaseTranslator):
                             speaker = msg.original_speaker
                         content = content.removesuffix("」")
                     else:
-                        speaker = None
+                        speaker = msg.original_speaker
 
                     # 删除多余的行
                     content = "\n".join(unescape(content).splitlines()[:len(msg.source.splitlines())])

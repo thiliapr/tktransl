@@ -40,7 +40,9 @@ def load_dicts(paths: tuple[list[Path], list[Path], list[Path]]) -> tuple[list[t
                     # 跳过空行
                     if not entry_str:
                         continue
-                    elif "->" not in entry_str:
+
+                    # 跳过缺少原文、译文分割符的行
+                    if "->" not in entry_str:
                         log("load_messages()", f"词条中缺少了`->`, 将会跳过该词条: {entry_str}", LogLevel.Warning)
                         continue
 
