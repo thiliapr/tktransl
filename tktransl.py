@@ -11,6 +11,7 @@ TkTransl的程序入口。
 """
 
 import json
+import os
 from asyncio import run
 from pathlib import Path
 from argparse import ArgumentParser
@@ -49,6 +50,9 @@ def main():
     parser.add_argument("--builtin-post-dict", action="append_const", const=(library_path / "postDict.txt"), dest="post_dict", help="使用内置的译后词典。")
     parser.add_argument("--builtin-gpt-dict", action="append_const", const=(library_path / "gptDict.txt"), dest="gpt_dict", help="使用内置的GPT词典。")
     args = parser.parse_args()
+
+    # 创建输出目录
+    os.makedirs(args.output_path, exist_ok=True)
 
     # 日志输出设置
     for level in LogLevelsAllowed.copy():
