@@ -22,9 +22,7 @@ from utils.translators import get_translator
 
 
 def main():
-    """
-    程序的主入口。
-    """
+    "程序的主入口。"
 
     # 显示程序信息
     print(
@@ -34,8 +32,7 @@ def main():
         "Source Code: https://github.com/thiliapr/tktransl\n"
     )
 
-    # 获取资源库路径
-    library_path = Path(__file__).absolute().parent / "library"
+    library_path = Path(__file__).absolute().parent / "library"  # 获取资源库路径
 
     # 解析参数
     parser = ArgumentParser(description="由thiliapr开发的翻译工具。")
@@ -51,20 +48,16 @@ def main():
     parser.add_argument("--builtin-gpt-dict", action="append_const", const=(library_path / "gptDict.txt"), dest="gpt_dict", help="使用内置的GPT词典。")
     args = parser.parse_args()
 
-    # 创建输出目录
-    os.makedirs(args.output_path, exist_ok=True)
+    os.makedirs(args.output_path, exist_ok=True)  # 创建输出目录
 
     # 日志输出设置
     for level in LogLevelsAllowed.copy():
         if level.name in args.not_allowed_logging_levels:
             LogLevelsAllowed.discard(level)
 
-    # 读取词典
-    dicts = load_dicts((args.pre_dict, args.post_dict, args.gpt_dict))
-
-    # 读取配置
+    dicts = load_dicts((args.pre_dict, args.post_dict, args.gpt_dict))   # 读取词典
     with open(args.config, encoding="utf-8") as f:
-        config = json.load(f)
+        config = json.load(f)  # 读取配置
 
     # 加载文本
     all_messages = load_messages(args.input_path, args.output_path)
@@ -72,11 +65,9 @@ def main():
 
     # 从配置中加载翻译器
     translators: list[BaseTranslator] = []
-
     for translator_id, translators_config in config["translators"].items():
         for translator_config in translators_config:
             translators.append(get_translator(translator_id)(**(config.get(translator_id, {}) | translator_config)))
-
     if not translators:
         log("Main", "没有翻译器以供翻译。", level=LogLevel.Fatal)
         return
@@ -85,9 +76,7 @@ def main():
     for filepath, file_messages in all_messages.items():
         if not file_messages:
             continue
-
-        # 初始化变量
-        interrupted = False
+        interrupted = False  # 初始化变量
 
         # 等待翻译完成
         try:
@@ -101,9 +90,7 @@ def main():
                 output = json.load(f)
         else:
             output = []
-
         output = sorted(output + [msg.jsonify() for msg in file_messages if msg.translation], key=lambda x: x["index"])
-
         with open(args.output_path / filepath, mode="w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent="\t")
 

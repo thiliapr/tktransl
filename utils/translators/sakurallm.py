@@ -108,9 +108,7 @@ class SakuraLLMTranslator(BaseTranslator):
         """
         启动一个翻译协程。
         """
-
-        # 初始化变量
-        excluded_messages: set[int] = set()
+        excluded_messages: set[int] = set()  # 初始化变量
 
         # 循环翻译
         while True:
@@ -119,9 +117,7 @@ class SakuraLLMTranslator(BaseTranslator):
             if not messages_to_translate:
                 break
 
-            # 初始化frequency_penalty
-            frequency_penalty = 0
-
+            frequency_penalty = 0  # 初始化frequency_penalty
             # 一直翻译直到成功
             while True:
                 # 构造批量翻译文本
@@ -253,16 +249,12 @@ class SakuraLLMTranslator(BaseTranslator):
                 # 无法翻译、致命错误
                 if error != 1:
                     break
-
-            # 无法翻译
-            if error == 2:
+            if error == 2:  # 无法翻译
                 continue
-            # 致命错误
-            if error == 3:
+            if error == 3:  # 致命错误
                 break
 
-            # 删除上、下文
-            resp = "\n".join(resp.splitlines()[1:-1])
+            resp = "\n".join(resp.splitlines()[1:-1])  # 删除上、下文
 
             # 还原
             destinations = resp.splitlines()
@@ -280,9 +272,7 @@ class SakuraLLMTranslator(BaseTranslator):
                         content = content.removesuffix("」")
                     else:
                         speaker = msg.original_speaker
-
-                    # 删除多余的行
-                    content = "\n".join(unescape(content).splitlines()[:len(msg.source.splitlines())])
+                    content = "\n".join(unescape(content).splitlines()[:len(msg.source.splitlines())])  # 删除多余的行
 
                     # 译后词典操作
                     for entry in dicts[1]:
