@@ -235,16 +235,17 @@ class SakuraLLMTranslator(BaseTranslator):
                         await sleep(3)
                         error = 1
 
-                # 检测是否翻译行数是否小于原文行数
-                if not error and len(resp.splitlines()) < len(sources.splitlines()):
-                    error = 1 if await self._half_messages("翻译行数小于原文行数", messages_to_translate, messages_lock, excluded_messages) else 2
-
                 # 结束时再检测一次是否存在空行
                 if not error:
                     for index, line in enumerate(resp.splitlines()):
                         if not line:
                             error = 1 if await self._half_messages(f"第{index + 1}行为空", messages_to_translate, messages_lock, excluded_messages) else 2
                             break
+
+                # 检测是否翻译行数是否小于或大于原文行数
+                if not error and len(resp.splitlines()) != len(sources.splitlines()):
+                    cmp_result = len(resp.splitlines()) < len(sources.splitlines())
+                    error = 1 if await self._half_messages("翻译行数{}于原文行数".format("小" if cmp_result else "大"), messages_to_translate, messages_lock, excluded_messages) else 2
 
                 # 无法翻译、致命错误
                 if error != 1:
