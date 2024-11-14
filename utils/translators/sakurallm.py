@@ -255,6 +255,7 @@ class SakuraLLMTranslator(BaseTranslator):
             if error == 3:  # 致命错误
                 break
 
+            log(self.name, resp, level=LogLevel.Debug)
             resp = "\n".join(resp.splitlines()[1:-1])  # 删除上、下文
 
             # 还原
@@ -292,8 +293,8 @@ class SakuraLLMTranslator(BaseTranslator):
 
                     # 显示翻译
                     if msg.original_speaker:
-                        log(self.name, f"Source: {msg.original_speaker} says {msg.source}", level=LogLevel.Debug)
-                        log(self.name, f"  Dest: {msg.speaker_translation} says {msg.translation}", level=LogLevel.Debug)
+                        log(self.name, f"Source: {msg.original_speaker} says {msg.source}", level=LogLevel.Info)
+                        log(self.name, f"  Dest: {msg.speaker_translation} says {msg.translation}", level=LogLevel.Info)
                     else:
-                        log(self.name, f"Source: {msg.source}", level=LogLevel.Debug)
-                        log(self.name, f"  Dest: {msg.translation}", level=LogLevel.Debug)
+                        log(self.name, f"Source: {msg.source}", level=LogLevel.Info)
+                        log(self.name, f"  Dest: {msg.translation}", level=LogLevel.Info)
