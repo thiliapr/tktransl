@@ -130,8 +130,8 @@ class SakuraLLMTranslator(BaseTranslator):
                         source = source.replace("「", "“").replace("」", "”")
                         source = f"{msg.original_speaker}「{source}」"
 
-                    sources.append(f"{escape(source)}")
-                sources = "\n".join([msg.source for msg in messages_to_translate])
+                    sources.append(escape(source))
+                sources = "\n".join([msg for msg in sources])
 
                 # 连接上下文
                 previous_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
