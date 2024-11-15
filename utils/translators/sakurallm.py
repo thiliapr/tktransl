@@ -131,14 +131,13 @@ class SakuraLLMTranslator(BaseTranslator):
                         source = f"{msg.original_speaker}「{source}」"
 
                     sources.append(escape(source))
-                sources = "\n".join([msg for msg in sources])
 
                 # 连接上下文
                 previous_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[:messages.index(messages_to_translate[0])]]).splitlines()[-self.previous_lines:]))
                 next_content = escape("\n".join("\n".join([f"{msg.original_speaker}「{msg.source}」" if msg.original_speaker else msg.source for msg in messages[messages.index(messages_to_translate[-1]) + 1:]]).splitlines()[:self.next_lines]))
                 sources = "\n".join([
                     previous_content if previous_content else "没有上文",
-                    sources,
+                    *sources,
                     next_content if next_content else "没有下文"
                 ])
 
