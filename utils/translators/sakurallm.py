@@ -140,6 +140,7 @@ class SakuraLLMTranslator(BaseTranslator):
                     *sources,
                     next_content if next_content else "没有下文"
                 ])
+                log(self.name, sources, LogLevel.Debug)
 
                 # 译前词典操作
                 for entry in dicts[0]:
