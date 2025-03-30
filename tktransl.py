@@ -1,103 +1,154 @@
-#!/usr/bin/env python3
+"TkTransl 程序主入口模块。"
 
-# Copyright (C) 2024  thiliapr
+# Copyright (C) 2025  thiliapr
 # 本文件是 TkTransl 的一部分。
-# TkTransl 是自由软件：你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
-# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
+# TkTransl 是自由软件：你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，
+# 无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
+# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。
+# 请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
-"""
-TkTransl的程序入口。
-"""
-
 import json
-import os
-from asyncio import run
-from pathlib import Path
-from argparse import ArgumentParser
-from utils.extra import LogLevel, LogLevelsAllowed, log
-from utils.load import load_dicts, load_messages
-from utils.translate import BaseTranslator, translate_async
-from utils.translators import get_translator
+import threading
+import time
+import warnings
+from functools import partial
+from typing import Any
+
+DEFAULT_BATCH_SIZE = 7
+DEFAULT_HISTORY_SIZE = 2
+DEFAULT_TIMEOUT = 30
+
+# 在非Jupyter环境下导入模型和工具库
+if "get_ipython" not in globals():
+    from utils import read_work_info, read_glossary, read_text_to_translate
+    from sakurallm import batch_translate
+
+
+def thread_translate(
+    lock: threading.Lock,
+    result_ptr: list[list[dict[str, Any]]],
+    *args,
+    **kwargs
+) -> None:
+    """
+    线程安全的翻译函数，将翻译结果存入共享变量
+
+    该函数设计用于多线程环境，确保对共享变量的安全访问。它会先清空结果指针，
+    然后执行实际翻译，最后将结果存入共享变量。
+
+    Args:
+        lock: 线程锁对象，用于同步对共享变量的访问
+        result_ptr: 共享的结果列表指针，
+            用于存储翻译结果的结构为列表的列表
+        *args: 传递给batch_translate函数的位置参数
+        **kwargs: 传递给batch_translate函数的关键字参数
+    """
+    # 清空结果指针
+    with lock:
+        result_ptr.clear()
+
+    # 执行实际翻译
+    result = batch_translate(*args, **kwargs)
+
+    # 存储翻译结果
+    with lock:
+        result_ptr.append(result)
 
 
 def main():
-    "程序的主入口。"
+    """
+    主函数，协调整个翻译流程
 
-    # 显示程序信息
-    print(
-        "TkTransl  Copyright (C) 2024  thiliapr\n"
-        "This program comes with ABSOLUTELY NO WARRANTY.\n"
-        "This is free software, and you are welcome to redistribute it under certain conditions.\n"
-        "Source Code: https://github.com/thiliapr/tktransl\n"
-    )
+    主要流程:
+    1. 读取工作配置和术语表
+    2. 预处理待翻译文本
+    3. 并行调用翻译API
+    4. 保存翻译结果
+    """
+    # 读取工作配置
+    work_info = read_work_info()
+    batch_size = work_info.get("batch_size", DEFAULT_BATCH_SIZE)
+    history_size = work_info.get("history_size", DEFAULT_HISTORY_SIZE)
+    timeout = work_info.get("timeout", DEFAULT_TIMEOUT)
+    stream = work_info.get("stream", False)
 
-    library_path = Path(__file__).absolute().parent / "library"  # 获取资源库路径
+    # 多API时不能流式输出
+    if stream and len(work_info["api"]) > 1:
+        warnings.warn(f"多API时不能流式输出。现在有{len(work_info['api'])}。")
 
-    # 解析参数
-    parser = ArgumentParser(description="由thiliapr开发的翻译工具。")
-    parser.add_argument("-i", "--input", type=Path, required=True, dest="input_path", help="要翻译的文件")
-    parser.add_argument("-o", "--output", type=Path, required=True, dest="output_path", help="翻译的输出路径")
-    parser.add_argument("-c", "--config", type=Path, required=True, help="配置文件")
-    parser.add_argument("--pre-dict", type=Path, action="append", default=[], help="译前词典")
-    parser.add_argument("--post-dict", type=Path, action="append", default=[], help="译后词典")
-    parser.add_argument("--gpt-dict", type=Path, action="append", default=[], help="GPT词典")
-    parser.add_argument("--not-allowed-logging-level", action="append", dest="not_allowed_logging_levels", default=[], help="不允许某个等级的日志输出。等级: [Debug, Info, Warning, Error, Fatal]")
-    parser.add_argument("--builtin-pre-dict", action="append_const", const=(library_path / "preDict.txt"), dest="pre_dict", help="使用内置的译前词典。")
-    parser.add_argument("--builtin-post-dict", action="append_const", const=(library_path / "postDict.txt"), dest="post_dict", help="使用内置的译后词典。")
-    parser.add_argument("--builtin-gpt-dict", action="append_const", const=(library_path / "gptDict.txt"), dest="gpt_dict", help="使用内置的GPT词典。")
-    args = parser.parse_args()
+    # 读取术语表（译前处理、译后处理、GPT专用）
+    pre_dict, post_dict, gpt_dict = read_glossary(work_info.get("glossary", {}))
 
-    os.makedirs(args.output_path, exist_ok=True)  # 创建输出目录
+    # 处理每个待翻译文件
+    for file, sources in read_text_to_translate(work_info["project_path"]):
+        if not sources:
+            continue  # 跳过空文件
 
-    # 日志输出设置
-    for level in LogLevelsAllowed.copy():
-        if level.name in args.not_allowed_logging_levels:
-            LogLevelsAllowed.discard(level)
+        # 储存要翻译的文本的数量
+        number_sources = len(sources)
 
-    dicts = load_dicts((args.pre_dict, args.post_dict, args.gpt_dict))   # 读取词典
-    with open(args.config, encoding="utf-8") as f:
-        config = json.load(f)  # 读取配置
+        # 应用译前翻译术语替换
+        for source in sources:
+            for entry in pre_dict:
+                source["source"] = source["source"].replace(entry["source"], entry["target"])
 
-    # 加载文本
-    all_messages = load_messages(args.input_path, args.output_path)
-    log("Main", f"未翻译的文本有{len(all_messages)}个文件，{len([msg for file_msgs in all_messages.values() for msg in file_msgs])}条文本，{len([char for file_msgs in all_messages.values() for msg in file_msgs for char in msg.source])}个字符。")
+        targets = []
+        # 准备API线程池 (API, 线程锁, 结果指针)
+        api_pool = [(api, threading.Lock(), [None]) for api in work_info["api"]]
 
-    # 从配置中加载翻译器
-    translators: list[BaseTranslator] = []
-    for translator_id, translators_config in config["translators"].items():
-        for translator_config in translators_config:
-            translators.append(get_translator(translator_id)(**(config.get(translator_id, {}) | translator_config)))
-    if not translators:
-        log("Main", "没有翻译器以供翻译。", level=LogLevel.Fatal)
-        return
+        # 分批处理所有待翻译文本
+        while len(targets) < number_sources:
+            for api, lock, result_ptr in api_pool:
+                with lock:
+                    if not result_ptr:
+                        continue
 
-    # 开始翻译
-    for filepath, file_messages in all_messages.items():
-        if not file_messages:
-            continue
-        interrupted = False  # 初始化变量
+                    # 准备下一批翻译
+                    translate_func = partial(
+                        threading.Thread,
+                        target=thread_translate,
+                        args=(lock, result_ptr, sources[:batch_size], targets[-history_size:], gpt_dict, api),
+                        kwargs={
+                            "stream": stream,
+                            "timeout": timeout
+                        }
+                    )
 
-        # 等待翻译完成
-        try:
-            run(translate_async(filepath, file_messages, translators, dicts))
-        except KeyboardInterrupt:
-            interrupted = True
+                    # 该API线程空闲
+                    if not result_ptr[0]:
+                        # 启动翻译线程
+                        translate_func().start()
+                        sources = sources[batch_size:]
+                    else:  # 该API线程已完成
+                        # 应用译后翻译术语替换
+                        for result in result_ptr[0]:
+                            for entry in post_dict:
+                                result["target"] = result["target"].replace(entry["source"], entry["target"])
 
-        # 保存翻译结果
-        if (args.output_path / filepath).exists():
-            with open(args.output_path / filepath, encoding="utf-8") as f:
-                output = json.load(f)
-        else:
-            output = []
-        output = sorted(output + [msg.jsonify() for msg in file_messages if msg.translation], key=lambda x: x["index"])
-        with open(args.output_path / filepath, mode="w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent="\t")
+                        # 收集结果并排序
+                        targets.extend(result_ptr[0])
+                        targets.sort(key=lambda x: x["index"])
 
-        # 如果被打断就退出翻译
-        if interrupted:
-            log("Main", "翻译被打断，正在退出...")
-            break
+                        if sources:
+                            # 启动新翻译线程
+                            translate_func().start()
+                            sources = sources[batch_size:]
+            time.sleep(1)
+
+        # 读取原始文件并更新翻译结果
+        with open(file, encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 合并翻译结果到原始数据
+        for entry in targets:
+            data[entry["index"]].update(
+                {k: v for k, v in entry.items() if k != "index"}
+            )
+
+        # 写回文件
+        with open(file, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent="\t")
 
 
 if __name__ == "__main__":

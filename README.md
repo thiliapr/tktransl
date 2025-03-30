@@ -1,147 +1,38 @@
 # TkTransl
+## 简介
+这是一个使用[GalTransl模型](https://huggingface.co/SakuraLLM/Sakura-GalTransl-7B-v3)来将日语翻译为简体中文的项目。
 
-一个翻译文本的程序。
+## License
+![GNU GPL Version 3 Official Logo](https://www.gnu.org/graphics/gplv3-with-text-136x68.png)
 
-## 版权
+本项目采用[GNU GPLv3 or later](https://www.gnu.org/licenses/gpl-3.0.html)许可证。您可以自由使用、修改和分发本项目的代码，但必须在相同许可证或其任何后续版本下进行。
 
-TkTransl 是自由软件：你可以再分发之和/或依照由[自由软件基金会](https://www.fsf.org/)发布的[GNU 通用公共许可证](https://www.gnu.org/licenses/gpl-3.0.html)修改它，无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。  
-你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看[这个链接](https://www.gnu.org/licenses/)。
+## 联系方式
+- Email: thiliapr@tutanota.com
 
-## 用法
+## 详情
+- ~~由于这个程序全盘抄袭[GalTransl](https://github.com/GalTransl/GalTransl/)，所以~~有时候更新不是那么的及时。
+- 支持的版本: [`Sakura-GalTransl-7B-v3-Q5_K_S.gguf`](https://huggingface.co/SakuraLLM/Sakura-GalTransl-7B-v3/blob/main/Sakura-GalTransl-7B-v3-Q5_K_S.gguf)
+- System Prompt:
+  > 你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。
+- 对话 Prompt:
+  > [History]  
+  > 参考以下术语表（可为空，格式为src->dst #备注）：  
+  > [Glossary]  
+  > 根据以上术语表的对应关系和备注，结合历史剧情和上下文，将下面的文本从日文翻译成简体中文：  
+  > [Input]
 
-```shell
-# 安装依赖
-pip install -r requirements.sakurallm.txt
+## 无关软件本身的广告
+### Join the Blue Ribbon Online Free Speech Campaign!
+![Blue Ribbon Campaign Logo](https://www.eff.org/files/brstrip.gif)
 
-# 翻译
-python tktransl.py \
-    --input proj/input/ \
-    --output proj/output/ \
-    --config proj/config.json \
-    --pre-dict proj/preDict.txt \
-    --post-dict proj/postDict.txt \
-    --gpt-dict proj/gptDict.txt \
-    --builtin-pre-dict \
-    --builtin-post-dict \
-    --builtin-gpt-dict
-```
+支持[Blue Ribbon Online 言论自由运动](https://www.eff.org/pages/blue-ribbon-campaign)！  
+你可以通过向其[捐款](https://supporters.eff.org/donate)以表示支持。
 
-### 参数说明
+### 支持自由软件运动
+为什么要自由软件: [GNU 宣言](https://www.gnu.org/gnu/manifesto.html)
 
-`--input`: 必选。要翻译的文件。  
-`--output`: 必选。翻译的输出路径。  
-`--config`: 必选。配置文件。  
-`--pre-dict`: 多选。译前（预处理）词典。  
-`--post-dict`: 多选。译后词典。  
-`--gpt-dict`: 多选。GPT词典（用于大语言模型的词典）。  
-`--not-allowed-logging-level`: 多选。不允许某个等级的日志输出。等级: [Debug, Info, Warning, Error, Fatal]。  
-`--builtin-pre-dict`: 建议。使用内置的译前词典。  
-`--builtin-post-dict`: 建议。使用内置的译后词典。  
-`--builtin-gpt-dict`: 建议。使用内置的GPT词典。  
-
-## 文本
-
-### 输入
-
-```json
-[
-    {
-        "message": "原文",
-        "speaker": "说话的人，如果有的话。可以不写。",
-        "additional_info": "附加信息，翻译时不会用到，输出时会带有这个。类型可以是字符串、数值、列表、字典等等都行。"
-    },
-    {
-        "message": "另一则原文",
-    }
-]
-```
-
-### 输出
-
-```json
-[
-    {
-        // 该文本对象在原文的索引。
-        "index": 0,
-
-        "source": "原文",
-        "translation": "译文",
-        "translate_by": "哪个翻译器翻译的",
-
-        // 以下键值对都只有相应的值不为空（或假）时才会包含在输出内
-        "original_speaker": "说话的人的名字原文",
-        "speaker_translation": "说话的人的名字译文",
-        "additional_info": "原封不动的附加信息"
-    }
-]
-```
-
-## 词典
-
-### 译前、译后词典
-
-译前词典: 翻译前对原文处理。  
-译后词典: 翻译后对译文处理。
-
-格式如下:
-
-```text
-原文1->译文1
-
-// 注释
-原文2->译文2
-```
-
-### GPT词典
-
-用于[SakuraLLM](https://github.com/SakuraLLM/SakuraLLM)、[ChatGPT](https://chat.openai.com/)等大语言模型，以提高AI翻译的质量。
-
-格式如下:
-
-```text
-// 即使翻译与原文相同也要写
-白上->白上 #白上フブキ的姓，少女
-フブキ->吹雪 #白上フブキ的名，少女
-```
-
-## 配置
-
-### 示例
-
-配置顶层的设置是各个翻译器的通用设置，`translators`内的设置是个性化设置。
-
-```json
-{
-    "sakurallm": {
-        // 翻译时上文、下文分别的行数。此例中上文2行，下文1行。
-        "previous_lines": 2,
-        "next_lines": 1,
-
-        // 翻译风格，可以是“文艺”或者“流畅”。
-        "style": "文艺",
-
-        // 一次翻译多少行
-        "number_per_request_translate": 7,
-
-        // 支持的模型有`galtransl-v2`
-        "model": "galtransl-v2"
-    },
-    "translators": {
-        "sakurallm": [
-            {
-                // 通用设置。翻译器的名称。记录日志时会显示此名称。
-                "name": "SakuraLLM-1",
-
-                // 以下皆为SakuraLLM专有。
-                // OpenAI格式的API、时间限制（单位：秒）。
-                "api": "http://127.0.0.1:10086", 
-                "timeout": 5,
-
-                // 可选。重启服务器的API、时间限制（单位：秒）。
-                "restart_api": "http://127.0.0.1:14514/10086",
-                "restart_timeout": 60
-            }
-        ]
-    }
-}
-```
+你可以通过以下方式支持自由软件运动:
+- 向非自由程序或在线敌服务说不，哪怕只有一次，也会帮助自由软件。不和其他人使用它们会帮助更大。进一步，如果你告诉人们这是在捍卫自己的自由，那么帮助就更显著了。
+- [帮助 GNU 工程和自由软件运动](https://www.gnu.org/help/help.html)
+- [向 FSF 捐款](https://www.fsf.org/about/ways-to-donate/)
