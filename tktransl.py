@@ -156,7 +156,9 @@ def main():
                         progress_bar.update(len(batch_result))
                     # 翻译过程中发生错误
                     elif isinstance(batch_result, TranslateError):
-                        print(f"发生翻译错误: {batch_result}")
+                        # 仅在流式输出模式时，显示发生了什么错误
+                        if stream_output:
+                            print(f"发生翻译错误: {batch_result}")
 
                         # 释放原文并重新排序
                         untranslated_texts.extend(processing_texts)
