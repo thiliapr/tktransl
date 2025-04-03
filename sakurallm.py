@@ -1,22 +1,50 @@
 "SakuraLLM的翻译部分"
 # Copyright (C) 2025  thiliapr
 # 本文件是 TkTransl 的一部分。
-# TkTransl 是自由软件：你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
-# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
+# TkTransl 是自由软件: 你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，
+# 无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
+# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。
+# 请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
 import json
 import httpx
-import datetime
 from typing import Any, Optional, Iterator
+
+# 在非 Kaggle 环境下导入工具库
+if "get_ipython" not in globals():
+    from utils import generate_placeholder_token
 
 
 SYSTEM_PROMPT = "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。"
-USER_PROMPT_TEMPLATE = """[History]
+TRANSLATION_PROMPT_TEMPLATE = """历史翻译：[History]
 参考以下术语表（可为空，格式为src->dst #备注）：
 [Glossary]
 根据以上术语表的对应关系和备注，结合历史剧情和上下文，将下面的文本从日文翻译成简体中文：
 [Input]"""
+
+
+class TranslateError(RuntimeError):
+    "翻译相关异常的基类"
+
+
+class TranslationCountError(TranslateError):
+    """
+    原文与译文数量不匹配时抛出的异常。
+    当源文本列表和翻译结果列表的长度不一致时，表明翻译过程可能出现将两个连续的文本翻译为一个文本的情况。
+
+    Args:
+        sources_count: 源文数量
+        targets_count: 译文数量
+    """
+
+    def __init__(self, sources_count: int, targets_count: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sources_count = sources_count
+        self.targets_count = targets_count
+
+    def __str__(self):
+        return f"原文与译文数量不匹配。原文有 {self.sources_count} 条文本，而译文却有 {self.targets_count} 条。"
 
 
 def ask_stream(
@@ -30,11 +58,11 @@ def ask_stream(
     timeout: float = 4.0,
 ) -> Iterator[str]:
     """
-    向翻译API发送流式请求并获取翻译结果
+    向支持流式响应的API发送请求，并以流式方式获取生成的文本内容。
 
     Args:
         api: API基础URL
-        prompt: 完整的提示词
+        prompt: 用户输入的完整提示词
         temperature: 控制生成随机性的参数
         top_p: 核采样参数
         presence_penalty: 避免重复话题的参数
@@ -43,7 +71,7 @@ def ask_stream(
         timeout: 请求超时时间(单位: 秒)
 
     Returns:
-        异步生成器，逐块产生翻译结果
+        生成器，逐块产生API返回的文本内容
 
     Exceptions:
         RuntimeError: 当API返回非200状态码时抛出
@@ -81,8 +109,10 @@ def ask_stream(
             if not line:
                 continue
 
+            # 删除`data: `
+            line = line[6:]
+
             # 解析响应行
-            line = line.removeprefix("data: ")
             data = json.loads(line)
             choice = data["choices"][0]
 
@@ -98,11 +128,11 @@ def ask_stream(
 
 
 def batch_translate(
-    sources: list[dict[str, Any]],
-    history: list[dict[str, Any]],
-    glossary: list[dict[str, Any]],
-    api: str,
-    stream: bool = False,
+    source_texts: list[dict[str, Any]],
+    translation_history: list[dict[str, Any]],
+    glossary_terms: list[dict[str, Any]],
+    endpoint: str,
+    stream_output: bool = False,
     temperature: float = 1.0,
     top_p: float = 1.0,
     presence_penalty: float = 0.0,
@@ -111,111 +141,143 @@ def batch_translate(
     timeout: float = 4.0,
 ) -> list[dict[str, Any]]:
     """
-    批量翻译视觉小说文本
+    批量翻译视觉小说文本，支持术语表和历史上下文
 
+    处理流程:
+        1. 预处理文本中的特殊符号（如引号、换行符）
+        2. 构建包含历史翻译和术语表的完整提示词
+        3. 调用翻译API获取结果
+        4. 后处理结果（恢复特殊符号、验证数量一致性）
+        5. 返回结构化翻译结果
     Args:
-        sources: 待翻译文本列表，每个字典应包含:
-            - source: 原文内容
-            - speaker: 说话人名称 (可选)
-        history: 历史翻译记录，格式同sources，每个字典还应包含:
-            - target: 已翻译内容
-            - speaker_target: 说话人译名 (如有speaker)
-        glossary: 术语表，每个字典应包含:
-            - source: 原文术语
-            - target: 译文术语
-            - description: 术语说明 (可选)
-        api: 翻译API的基础URL
-        stream: 是否启用流式输出
-        temperature: 控制生成随机性的温度，值越高越随机
-        top_p: 核采样参数，控制生成多样性
+        source_texts: 待翻译文本列表，每个元素应包含:
+            - source: 原文内容（必需）
+            - speaker: 说话人标识（可选）
+        translation_history: 历史翻译记录，用于保持上下文一致性，每个元素应包含:
+            - source: 原文内容（必需）
+            - target: 已有译文（必需）
+            - speaker: 说话人原文（如有）
+            - target_speaker: 说话人译文（如有）
+        glossary_terms: 术语对照表，每个元素应包含:
+            - source: 原文术语（必需）
+            - target: 译文术语（必需）
+            - description: 术语说明（可选）
+        endpoint: 翻译API服务地址
+        stream_output: 是否实时输出翻译进度
+
+        temperature: 控制生成随机性的温度，值越高结果越多样
+        top_p: 核采样参数，控制词汇选择范围
         presence_penalty: 避免重复话题的，避免重复话题
         frequency_penalty: 避免重复用词的，避免重复用词
+
         proxy: 代理服务器地址
-        timeout: API请求超时时间(秒)
+        timeout: API请求超时时间（秒）
 
     Returns:
-        翻译结果列表，包含原始字段和新增的:
+        翻译结果列表，保留原始字段并新增:
             - target: 翻译内容
-            - target_speaker: 说话人译名 (如有speaker)
+            - target_speaker: 说话人译名（如果原文有speaker字段）
 
     Exceptions:
+        TranslationCountError: 当返回结果数量与输入不一致时抛出
         RuntimeError: 当API请求失败时抛出
     """
-    # 准备历史文本
-    history_entries = []
-    for entry in history:
-        # 标准化换行符并添加特殊标记
-        text = entry["target"].replace("\r\n", "\n").replace("\n", "<TRNewLine>")
+    # ========== 预处理阶段 ==========
+    # 获取原文样版
+    original_text_sample = "\n".join(entry["source"] for entry in source_texts)
 
-        # 处理带说话人的历史记录
-        if entry.get("speaker"):
-            text = f"{entry['speaker_target']}「{text.replace('「', '<TRQuoteStart>').replace('」', '<TRQuoteEnd>')}」"
+    # 生成防冲突的特殊标记
+    newline_token = generate_placeholder_token("NL", original_text_sample)
+    quote_start_token = generate_placeholder_token("QS", original_text_sample)
+    quote_end_token = generate_placeholder_token("QE", original_text_sample)
 
-        history_entries.append(text)
-    history_text = "历史翻译：" + "<TRNewSeq>".join(history_entries)
+    # 处理历史记录
+    processed_history = []
+    for history_entry in translation_history:
+        # 标准化文本格式
+        processed_text = history_entry["target"].replace("\r\n", "\n").replace("\n", newline_token)
 
-    # 准备术语表文本: 格式化为"原文->译文 #说明"的格式
-    glossary_text = "\n".join(
-        f"{g['source']}->{g['target']}" + (f" #{g['description']}" if g.get("description") else "")
-        for g in glossary
+        # 处理说话人标记
+        if "speaker" in history_entry:
+            speaker_name = history_entry.get("target_speaker", history_entry["speaker"])
+            processed_text = f"{speaker_name}「{processed_text.replace('「', quote_start_token).replace('」', quote_end_token)}」"
+        processed_history.append(processed_text)
+
+    # 构建历史上下文字符串
+    history_context = "<SEP>".join(processed_history)
+
+    # 处理术语表
+    glossary_context = "\n".join(
+        f"{term['source']}->{term['target']}"
+        + (f" #{term['description']}" if term.get("description") else "")
+        for term in glossary_terms
+        if term["source"] in original_text_sample
     )
 
-    # 准备源文本
-    source_entries = []
-    for entry in sources:
-        # 标准化换行符并添加特殊标记
-        text = entry["source"].replace("\r\n", "\n").replace("\n", "<TRNewLine>")
+    # 处理待翻译文本
+    processed_sources = []
+    for text_entry in source_texts:
+        # 标准化文本格式
+        processed_text = text_entry["source"].replace("\r\n", "\n").replace("\n", newline_token)
 
-        # 处理带说话人的文本
-        if "speaker" in entry:
-            text = f"{entry['speaker']}「{text.replace('「', '<TRQuoteStart>').replace('」', '<TRQuoteEnd>')}」"
+        # 处理说话人标记
+        if "speaker" in text_entry:
+            processed_text = f"{text_entry['speaker']}「{processed_text.replace('「', quote_start_token).replace('」', quote_end_token)}」"
+        processed_sources.append(processed_text)
 
-        source_entries.append(text)
-    source_text = "\n".join(source_entries)
-
+    # ========== API调用阶段 ==========
     # 构建完整提示词
-    prompt = USER_PROMPT_TEMPLATE.replace("[History]", history_text).replace("[Glossary]", glossary_text).replace("[Input]", source_text)
+    final_prompt = (
+        TRANSLATION_PROMPT_TEMPLATE
+        .replace("[History]", history_context)
+        .replace("[Glossary]", glossary_context)
+        .replace("[Input]", "\n".join(processed_sources))
+    )
 
     # 获取翻译结果
-    if stream:
-        print(datetime.datetime.now().strftime("%H:%M:%S"))
+    api_response = ""
+    for response_chunk in ask_stream(endpoint, final_prompt, temperature, top_p, presence_penalty, frequency_penalty, proxy, timeout):
+        api_response += response_chunk
+        if stream_output:
+            print(response_chunk, end="", flush=True)
 
-    response_text = ""
-    for chunk in ask_stream(api, prompt, temperature, top_p, presence_penalty, frequency_penalty, proxy, timeout):
-        response_text += chunk
-        if stream:
-            print(chunk, end="", flush=True)
+    if stream_output:
+        print()  # 流式输出结束换行
 
-    if stream:
-        print()
+    # ========== 译后处理阶段 ==========
+    # 验证结果数量
+    response_lines = api_response.splitlines()
+    if len(source_texts) != len(response_lines):
+        if len(source_texts) == 1:  # 单条输入特殊处理
+            api_response = api_response.replace("\n", "")
+            response_lines = [api_response]
+        else:
+            raise TranslationCountError(len(source_texts), len(response_lines))
 
-    # 处理翻译结果
-    translated_entries = []
-    for source, target in zip(sources, response_text.splitlines()):
-        # 还原换行
-        target = target.replace("<TRNewLine>", "\n")
+    # 结构化处理结果
+    final_results = []
+    for source_entry, translated_text in zip(source_texts, response_lines):
+        # 恢复原始格式
+        restored_text = translated_text.replace(newline_token, "\n")
+        result_entry = {**source_entry, "target": restored_text}
 
-        # 创建结果条目
-        entry = {**source, "target": target}
+        # 处理说话人信息
+        if "speaker" in source_entry and "「" in restored_text:
+            speaker_part, dialog_part = restored_text.split("「", 1)
+            dialog_content = dialog_part[:dialog_part.rfind("」")] if "」" in dialog_part else dialog_part
 
-        # 处理带说话人的文本
-        if source.get("speaker") and "「" in target:
-            # 分割说话人和对话内容
-            target_speaker, target_content = target.split("「", 1)
+            # 恢复特殊符号
+            dialog_content = (
+                dialog_content
+                .replace(quote_start_token, "「")
+                .replace(quote_end_token, "」")
+            )
 
-            # 查找对话结束位置
-            quote_end_pos = target_content.rfind("」")
-            if quote_end_pos != -1:
-                target_content = target_content[:quote_end_pos]
-
-            # 恢复特殊标记
-            target_content = target_content.replace("<TRQuoteStart>", "「").replace("<TRQuoteEnd>", "」")
-
-            entry.update({
-                "target": target_content,
-                "target_speaker": target_speaker
+            result_entry.update({
+                "target": dialog_content,
+                "target_speaker": speaker_part
             })
 
-        translated_entries.append(entry)
+        final_results.append(result_entry)
 
-    return translated_entries
+    return final_results

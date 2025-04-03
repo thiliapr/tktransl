@@ -22,7 +22,8 @@ proj
 +---chapter1.json
 |---chapter2.json
 |---sub_folder
-|   +---workfor8hours1day.json
+|   +---work_8h_per_day.json
+|   +---june_fourth_1989.json
 |   \---make_china_great_again.json
 ```
 其中，每一个文件都储存了要翻译的文本。
@@ -59,8 +60,8 @@ proj
 - `batch_size (int)`: 每次翻译的文本数量
 - `history_size (int)`: 翻译历史的大小
 - `timeout (float)`: 翻译请求的超时时间
-- `stream (bool)`: 是否启用流式输出
-- `api (list[str])`: 使用的翻译 API 列表
+- `stream_output (bool)`: 是否启用流式输出
+- `endpoints (list[str])`: 使用的翻译 API 列表
 - `glossary`: 术语表，用于翻译前后处理
   包含术语表配置的字典，应包含以下可选键:
     - `pre`: 译前词典配置
@@ -71,6 +72,7 @@ proj
     - `file (list[str])`: 术语表文件路径列表
     - `list (list[dict])` : 直接指定的术语项列表
 - `project_path (path-like str)`: 待翻译文本的路径
+- `proxy (str)`: 要使用的代理。没有就不写这条。
 可以查看`work.json`以具体了解如何配置。
 
 ### 运行程序
@@ -111,13 +113,13 @@ python tktransl.py
 - Email: thiliapr@tutanota.com
 
 # 无关软件本身的广告
-### Join the Blue Ribbon Online Free Speech Campaign!
+## Join the Blue Ribbon Online Free Speech Campaign!
 ![Blue Ribbon Campaign Logo](https://www.eff.org/files/brstrip.gif)
 
 支持[Blue Ribbon Online 言论自由运动](https://www.eff.org/pages/blue-ribbon-campaign)！  
 你可以通过向其[捐款](https://supporters.eff.org/donate)以表示支持。
 
-### 支持自由软件运动
+## 支持自由软件运动
 为什么要自由软件: [GNU 宣言](https://www.gnu.org/gnu/manifesto.html)
 
 你可以通过以下方式支持自由软件运动:

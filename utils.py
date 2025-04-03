@@ -1,11 +1,14 @@
 "闲散的工具集。"
 # Copyright (C) 2025  thiliapr
 # 本文件是 TkTransl 的一部分。
-# TkTransl 是自由软件：你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
-# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。请参看 GNU 通用公共许可证，了解详情。
+# TkTransl 是自由软件: 你可以再分发之和/或依照由自由软件基金会发布的 GNU 通用公共许可证修改之，
+# 无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
+# 发布 TkTransl 是希望它能有用，但是并无保障; 甚至连可销售和符合某个特定的目的都不保证。
+# 请参看 GNU 通用公共许可证，了解详情。
 # 你应该随程序获得一份 GNU 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
 import json
+import random
 import pathlib
 from typing import Any, Iterator
 
@@ -116,7 +119,7 @@ def read_glossary(config: dict[str, any]) -> tuple[list[dict[str, str]], list[di
     return pre_dict, post_dict, gpt_dict
 
 
-def read_text_to_translate(project_path: str) -> Iterator[tuple[str, list[dict[str, Any]]]]:
+def read_texts_to_translate(project_path: str) -> Iterator[tuple[pathlib.Path, list[dict[str, Any]]]]:
     """
     递归查找项目目录中所有需要翻译的文本内容，以迭代器形式返回。
 
@@ -154,3 +157,30 @@ def read_text_to_translate(project_path: str) -> Iterator[tuple[str, list[dict[s
         # 只添加有需要翻译内容的文件
         if valid_entries:
             yield json_file, valid_entries
+
+
+def generate_placeholder_token(base_name: str, text: str, max_attempts: int = 10) -> str:
+    """
+    生成一个在给定文本中不存在的唯一标记。
+    标记格式为：<base_name-random_number>，其中random_number是0到65535(2^16)之间的随机数。
+
+    Args:
+        base_name: 标记的基础名称，将作为生成标记的前缀
+        text: 要检查的文本内容，确保生成的标记不在其中
+        max_attempts: 最大尝试次数
+
+    Returns:
+        生成的唯一标记
+
+    Examples:
+        >>> text = "This is a sample text containing <test-123>"
+        >>> token = generate_unique_token("test", text)
+        >>> print(token)
+        <test-456>  # 随机生成的数字，保证不在原文本中
+    """
+    max_attempts = 10
+    for _ in range(max_attempts):
+        token = f"<{base_name}-{random.randint(0, 2**16)}>"
+        if token not in text:
+            return token
+    raise RuntimeError(f"无法为`{base_name}`生成唯一标记")

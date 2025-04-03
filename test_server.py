@@ -13,12 +13,13 @@ class LLMHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
 
-        self.rfile.read(int(self.headers["Content-Length"]))
+        prompt = json.loads(self.rfile.read(int(self.headers["Content-Length"])))["messages"][1]["content"]
+        source = prompt.split("根据以上术语表的对应关系和备注，结合历史剧情和上下文，将下面的文本从日文翻译成简体中文：", 1)[1].strip()
+        print(source)
 
-        content = "Fubuki「Hi Friends!」"
+        content = "\n".join("Fubuki「Hi Friends!」" for _ in range(source.count("\n") + 1))
         while content:
             number_translated = random.randint(3, 5)
-            print(content[:number_translated], end="", flush=True)
             self.wfile.write(("data: " + json.dumps({
                 "choices": [
                     {
