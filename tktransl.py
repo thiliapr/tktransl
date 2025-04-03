@@ -167,8 +167,6 @@ def main():
                             # 减少一半文本重试
                             dynamic_batch_size //= 2
 
-                            print(f"对半拆分至 {dynamic_batch_size} 条重试。")
-
                     # 清空处理中文本列表
                     processing_texts.clear()
 
