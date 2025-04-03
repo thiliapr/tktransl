@@ -42,10 +42,6 @@ def thread_wrapper(
         *args: 传递给batch_translate函数的位置参数
         **kwargs: 传递给batch_translate函数的关键字参数
     """
-    # 清空结果指针
-    with lock:
-        result_container.clear()
-
     # 执行实际翻译
     try:
         result = batch_translate(*args, **kwargs)
@@ -169,8 +165,9 @@ def main():
                             # 减少一半文本重试
                             dynamic_batch_size //= 2
 
-                    # 清空处理中文本列表
+                    # 清空处理中文本列表和结果容器
                     processing_texts.clear()
+                    result_container.clear()
 
                     # 翻译下一批文本
                     if untranslated_texts:

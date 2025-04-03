@@ -17,7 +17,7 @@ class LLMHandler(BaseHTTPRequestHandler):
         source = prompt.split("根据以上术语表的对应关系和备注，结合历史剧情和上下文，将下面的文本从日文翻译成简体中文：", 1)[1].strip()
         print(source)
 
-        content = "\n".join("Fubuki「Hi Friends!」" for _ in range(source.count("\n") + 1))
+        content = "\n".join("Fubuki「Hi Friends!」" for _ in range(source.count("\n") + int(random.random() + 0.9)))
         while content:
             number_translated = random.randint(3, 5)
             self.wfile.write(("data: " + json.dumps({
