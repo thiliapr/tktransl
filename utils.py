@@ -27,9 +27,9 @@ def read_work_info() -> dict[str, Any]:
     """
     if "WORK_INFO" in globals():  # 如果已经定义`WORK_INFO`，使用其作为工作信息
         return globals()["WORK_INFO"]  # 为了避免检查，从`globals()`读取工作信息
-    else:
-        with open("work.json", encoding="utf-8") as f:
-            return json.load(f)
+
+    with open("work.json", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def read_glossary(config: dict[str, any]) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
