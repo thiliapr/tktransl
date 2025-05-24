@@ -11,15 +11,17 @@ import json
 import threading
 import time
 import warnings
-import tqdm
 from typing import Any, Union
 
 DEFAULT_BATCH_SIZE = 7
 DEFAULT_HISTORY_SIZE = 2
 DEFAULT_TIMEOUT = 30
 
-# 在非 Kaggle 环境下导入模型和工具库
-if "get_ipython" not in globals():
+# 根据是否在 Jupyter 环境下导入不同库
+if "get_ipython" in globals():
+    from tqdm.notebook import tqdm_notebook as tqdm
+else:
+    from tqdm import tqdm
     from utils import read_work_info, read_glossary, read_texts_to_translate
     from sakurallm import TranslateError, TranslationCountError, batch_translate
 
@@ -100,7 +102,7 @@ def main():
 
         # 初始化进度跟踪
         total_texts = len(untranslated_texts)
-        progress_bar = tqdm.tqdm(desc=file.name, total=total_texts)
+        progress_bar = tqdm(desc=file.name, total=total_texts)
 
         # 应用译前翻译术语替换
         for source in untranslated_texts:
