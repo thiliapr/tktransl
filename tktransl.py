@@ -4,19 +4,23 @@
 # SPDX-FileContributor: thiliapr <thiliapr@tutanota.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import json
+import argparse
 import threading
 import time
 import warnings
+import pathlib
 from typing import Any, Union
 
+import orjson
 from tqdm import tqdm
-from utils import read_work_info, read_glossary, read_texts_to_translate
+from utils import read_translation_dict, read_gpt_dict, read_texts_to_translate
 from sakurallm import TranslateError, TranslationCountError, batch_translate
 
 DEFAULT_BATCH_SIZE = 7
 DEFAULT_HISTORY_SIZE = 2
 DEFAULT_TIMEOUT = 30
+DEFAULT_TOP_P = 0.8
+DEFAULT_TEMPRATURE = 0.3
 
 
 def thread_wrapper(
@@ -49,47 +53,52 @@ def thread_wrapper(
 
 
 def main():
-    """
-    视觉小说翻译主流程控制器
-
-    完整工作流程:
-    1. 初始化阶段:
-       - 读取项目配置文件
-       - 加载术语表（译前处理/译后处理/GPT专用）
-    2. 译前处理阶段:
-       - 扫描项目目录获取待翻译文件
-       - 应用译前处理术语替换
-    3. 并行翻译阶段:
-       - 动态批次大小管理（根据错误自动调整）
-       - 多API负载均衡
-       - 实时进度显示
-    4. 译后处理阶段:
-       - 应用译后处理术语替换
-       - 结果排序与合并
-       - 写回翻译文件
-
-    异常处理策略:
-       - 数量不匹配: 自动减半批次大小重试
-    """
     # ==================== 初始化阶段 ====================
-    # 读取工作配置
-    work_info = read_work_info()
-    batch_size = work_info.get("batch_size", DEFAULT_BATCH_SIZE)
-    history_size = work_info.get("history_size", DEFAULT_HISTORY_SIZE)
-    timeout = work_info.get("timeout", DEFAULT_TIMEOUT)
-    stream_output = work_info.get("stream_output", False)
+    # 解析命令行参数
+    parser = argparse.ArgumentParser(description="TkTransl 翻译工具")
+    parser.add_argument("project-path", type=str, help="待翻译项目的路径")
+    parser.add_argument("endpoints", type=str, nargs="+", help="API端点列表，至少一个")
+    parser.add_argument("-b", "--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="每次翻译的文本数量，默认为 %(default)s")
+    parser.add_argument("-h", "--history-size", type=int, default=DEFAULT_HISTORY_SIZE, help="翻译时提供给模型的历史翻译记录的数量，默认为 %(default)s")
+    parser.add_argument("-s", "--stream-output", action="store_true", help="启用流式输出模式，逐条显示翻译结果")
+    parser.add_argument("-p", "--pre-dict", type=str, action="append", default=[], help="译前处理术语表文件路径，可以多次指定")
+    parser.add_argument("-o", "--post-dict", type=str, action="append", default=[], help="译后处理术语表文件路径，可以多次指定")
+    parser.add_argument("-g", "--gpt-dict", type=str, action="append", default=[], help="GPT专用术语表文件路径，可以多次指定")
+    parser.add_argument("-t", "--timeout", type=float, default=DEFAULT_TIMEOUT, help="API请求超时时间（秒），默认为 %(default)s")
+    parser.add_argument("--top-p", type=float, default=DEFAULT_TOP_P, help="设置生成模型的 top_p 参数，默认为 %(default)s")
+    parser.add_argument("--temperature", type=float, default=DEFAULT_TEMPRATURE, help="设置生成模型的 temperature 参数，默认为 %(default)s")
+    parser.add_argument("--presence-penalty", type=float, default=0.0, help="设置生成模型的 presence_penalty 参数，默认为 %(default)s")
+    parser.add_argument("--frequency-penalty", type=float, default=0.0, help="设置生成模型的 frequency_penalty 参数，默认为 %(default)s")
+    parser.add_argument("--no-builtin-pre-dict", action="store_true", help="禁用内置的译前处理术语表")
+    parser.add_argument("--no-builtin-post-dict", action="store_true", help="禁用内置的译后处理术语表")
+    parser.add_argument("--no-builtin-gpt-dict", action="store_true", help="禁用内置的GPT专用术语表")
+    parser.add_argument("--proxy", type=str, default=None, help="代理服务器地址，默认无代理")
+    args = parser.parse_args()
 
-    # 流式输出兼容性检查
-    if stream_output and len(work_info["endpoints"]) > 1:
+    # 如果启用了流式输出，但有多个API端点，则禁用流式输出模式，因为多API并行时不支持流式显示
+    if args.stream_output and len(args.endpoints) > 1:
         stream_output = False
-        warnings.warn(f"已禁用流式输出模式（多API并行时不支持流式显示）。当前配置API数量: {len(work_info['endpoints'])}。")
+        warnings.warn(f"已禁用流式输出模式（多API并行时不支持流式显示）。当前配置API数量: {len(args.endpoints)}。")
+
+    # 添加内置的术语表文件路径
+    pre_dict = args.pre_dict
+    post_dict = args.post_dict
+    gpt_dict = args.gpt_dict
+    if not args.no_builtin_pre_dict:
+        pre_dict.append(pathlib.Path(__file__).parent / "library/preDict.txt")
+    if not args.no_builtin_post_dict:
+        post_dict.append(pathlib.Path(__file__).parent / "library/postDict.txt")
+    if not args.no_builtin_gpt_dict:
+        gpt_dict.append(pathlib.Path(__file__).parent / "library/gptDict.txt")
 
     # 读取术语表（译前处理、译后处理、GPT专用）
-    pre_dict, post_dict, gpt_dict = read_glossary(work_info.get("glossary", {}))
+    pre_dict = read_translation_dict(pre_dict)
+    post_dict = read_translation_dict(post_dict)
+    gpt_dict = read_gpt_dict(gpt_dict)
 
     # ==================== 文件处理循环 ====================
     # 处理每个待翻译文件
-    for file, untranslated_texts in read_texts_to_translate(work_info["project_path"]):
+    for file, untranslated_texts in read_texts_to_translate(args.project_path):
         if not untranslated_texts:
             continue  # 跳过空文件
 
@@ -106,11 +115,11 @@ def main():
         # 初始化API工作池 (endpoint, 状态锁, 结果引用, 处理中批次)
         api_workers = [
             (endpoint, threading.Lock(), [None], [])
-            for endpoint in work_info["endpoints"]
+            for endpoint in args.endpoints
         ]
 
         translated_results = []  # 最终翻译结果存储
-        dynamic_batch_size = batch_size  # 动态调整的批次大小
+        dynamic_batch_size = args.batch_size  # 动态调整的批次大小
 
         while len(translated_results) < total_texts:
             for endpoint, lock, result_container, processing_texts in api_workers:
@@ -134,7 +143,7 @@ def main():
                         translated_results.sort(key=lambda x: x["index"])
 
                         # 重置动态批次大小为初始值
-                        dynamic_batch_size = batch_size
+                        dynamic_batch_size = args.batch_size
 
                         # 更新进度
                         progress_bar.update(len(batch_result))
@@ -166,11 +175,15 @@ def main():
                         # 启动翻译线程
                         threading.Thread(
                             target=thread_wrapper,
-                            args=(lock, result_container, text_to_translate, translated_results[-history_size:], gpt_dict, endpoint),
+                            args=(lock, result_container, text_to_translate, translated_results[-args.history_size:], gpt_dict, endpoint),
                             kwargs={
                                 "stream_output": stream_output,
-                                "timeout": timeout,
-                                "proxy": work_info.get("proxy")
+                                "timeout": args.timeout,
+                                "proxy": args.proxy,
+                                "top_p": args.top_p,
+                                "temperature": args.temperature,
+                                "presence_penalty": args.presence_penalty,
+                                "frequency_penalty": args.frequency_penalty
                             },
                             daemon=True
                         ).start()
@@ -186,8 +199,8 @@ def main():
 
         # ============== 结果写入阶段 ==============
         # 读取原始文件并更新翻译结果
-        with open(file, encoding="utf-8") as f:
-            data = json.load(f)
+        with open(file, "rb") as f:
+            data = orjson.loads(f.read())
 
         # 合并翻译结果到原始数据
         for entry in translated_results:
@@ -196,8 +209,8 @@ def main():
             )
 
         # 写回文件
-        with open(file, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent="\t")
+        with open(file, "wb") as f:
+            f.write(orjson.dumps(data))
 
 
 if __name__ == "__main__":

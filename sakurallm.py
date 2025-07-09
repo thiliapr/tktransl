@@ -4,7 +4,7 @@
 # SPDX-FileContributor: thiliapr <thiliapr@tutanota.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import json
+import orjson
 from typing import Any, Optional, Iterator
 import httpx
 from utils import generate_placeholder_token
@@ -48,8 +48,8 @@ def ask_stream(
     top_p: float,
     presence_penalty: float,
     frequency_penalty: float,
+    timeout: float,
     proxy: Optional[str] = None,
-    timeout: float = 4.0,
 ) -> Iterator[str]:
     """
     向支持流式响应的API发送请求，并以流式方式获取生成的文本内容。
@@ -61,8 +61,8 @@ def ask_stream(
         top_p: 核采样参数
         presence_penalty: 避免重复话题的参数
         frequency_penalty: 避免重复用词的参数
-        proxy: 可选代理设置
         timeout: 请求超时时间(单位: 秒)
+        proxy: 可选代理设置
 
     Returns:
         生成器，逐块产生API返回的文本内容
@@ -107,7 +107,7 @@ def ask_stream(
             line = line[6:]
 
             # 解析响应行
-            data = json.loads(line)
+            data = orjson.loads(line)
             choice = data["choices"][0]
 
             # 检查是否结束
@@ -126,13 +126,13 @@ def batch_translate(
     translation_history: list[dict[str, Any]],
     glossary_terms: list[dict[str, Any]],
     endpoint: str,
-    stream_output: bool = False,
-    temperature: float = 1.0,
-    top_p: float = 1.0,
-    presence_penalty: float = 0.0,
-    frequency_penalty: float = 0.0,
+    stream_output: bool,
+    temperature: float,
+    top_p: float,
+    presence_penalty: float,
+    frequency_penalty: float,
+    timeout: float,
     proxy: Optional[str] = None,
-    timeout: float = 4.0,
 ) -> list[dict[str, Any]]:
     """
     批量翻译视觉小说文本，支持术语表和历史上下文
@@ -164,8 +164,8 @@ def batch_translate(
         presence_penalty: 避免重复话题的，避免重复话题
         frequency_penalty: 避免重复用词的，避免重复用词
 
-        proxy: 代理服务器地址
         timeout: API请求超时时间（秒）
+        proxy: 代理服务器地址
 
     Returns:
         翻译结果列表，保留原始字段并新增:

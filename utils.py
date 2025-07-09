@@ -4,108 +4,111 @@
 # SPDX-FileContributor: thiliapr <thiliapr@tutanota.com>
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import json
+import orjson
 import random
 import pathlib
 from typing import Any, Iterator
 
 
-def read_work_info() -> dict[str, Any]:
+def read_translation_dict(files: list[pathlib.Path]) -> list[dict[str, str]]:
     """
-    从work.json文件加载工作配置信息。
-
+    从指定的文件列表中读取译前/译后处理词典。  
+    每个文件应包含多行，每行格式为: `源文本->目标文本`。  
+    支持单行注释和空行，注释以 `//` 开头。  
+    注意: 不支持行内注释（比如说，`fubuki->吹雪  // this is en_to_zh`是不合法的）。  
+    格式示例: `Hello->你好`（`->`前后没有空格）。
+    
+    Args:
+        files: 包含术语表文件路径的列表，每个文件应为文本格式。
+    
     Returns:
-        包含工作配置信息的字典
+        包含译前/译后处理词典的列表，每个词典项为字典，包含以下键:
+            - "source": 源文本
+            - "target": 目标文本
+    
+    Examples:
+        >>> files = [pathlib.Path("pre_dict.txt")]
+        >>> pre_dict = read_translation(files)
+        >>> print(pre_dict)
+        [{'source': 'Hello', 'target': '你好'}, {'source': 'World', 'target': '世界'}]
     """
-    with open("work.json", encoding="utf-8") as f:
-        return json.load(f)
+    # 初始化译前/译后处理词典列表
+    translation = []
+
+    # 遍历每个文件
+    for file in files:
+        with open(file, encoding="utf-8") as f:
+            # 逐行读取文件内容
+            for line in f:
+                # 清理行内容，去除首尾空格
+                line = line.strip()
+
+                # 跳过空行和注释行、无效行
+                if not line or line.startswith("//") or "->" not in line:
+                    continue
+
+                # 分割源文本和目标文本
+                source, target = [part.strip() for part in line.split("->", 1)]
+
+                # 添加到词典
+                translation.append({"source": source, "target": target})
+
+    return translation
 
 
-def read_glossary(config: dict[str, any]) -> tuple[list[dict[str, str]], list[dict[str, str]], list[dict[str, str]]]:
+def read_gpt_dict(files: list[pathlib.Path]) -> list[dict[str, str]]:
     """
-    从配置文件读取并解析三种类型的术语表词典。
+    从指定的文件列表中读取GPT专用词典。  
+    每个文件应包含多行，每行格式为: `源文本->目标文本 #描述`。  
+    支持单行注释和空行，注释以 `//` 开头。  
+    注意: 不支持行内注释（比如说，`fubuki->吹雪  // this is en_to_zh`是不合法的）。  
+    格式示例: `shirakami fubuki->白上吹雪 #虚拟主播，Hololive成员`（`->`前后没有空格；` #`前有空格，后面没有）。
 
     Args:
-        config: 包含术语表配置的字典，应包含以下可选键:
-            - "pre": 译前词典配置
-            - "post": 译后词典配置
-            - "gpt": GPT词典配置
-            每个配置应包含以下可选键:
-                - "file" (list[str]): 术语表文件路径列表
-                - "list" (list[dict]): 直接指定的术语项列表
-
+        files: 包含GPT词典文件路径的列表，每个文件应为文本格式。
+    
     Returns:
-        包含三个元素的元组，按顺序为:
-            1. 译前词典
-            2. 译后词典
-            3. GPT词典
-
-        每个词典项为包含以下键的字典:
-            - "source": 源文本 (必选)
-            - "target": 目标文本 (必选)
-            - "description": 描述文本 (仅GPT词典可选)
-
-    文件格式说明:
-        - 每行一个术语项，格式为: 源文本->目标文本
-        - 支持行内注释: 使用 // 符号
-        - 空行会被忽略
-        - GPT词典专用: 可使用 #符号添加描述
-          示例: 源文本->目标文本 #这是描述
-
-    配置示例:
-        {
-            "pre": {
-                "file": ["pre_dict.txt"],
-                "list": [{"source": "A", "target": "B"}]
-            },
-            "gpt": {
-                "file": ["gpt_dict.txt"]
-            }
-        }
+        包含GPT词典的列表，每个词典项为字典，包含以下键:
+            - "source": 源文本
+            - "target": 目标文本
+            - "description": 描述文本（可选）
+    
+    Examples:
+        >>> files = [pathlib.Path("gpt_dict.txt")]
+        >>> gpt_dict = read_gpt_dict(files)
+        >>> print(gpt_dict)
+        [{'source': 'Hello', 'target': '你好', 'description': '问候语'}, {'source': 'World', 'target': '世界'}]
     """
-    pre_dict = []  # 译前词典
-    post_dict = []  # 译后词典
-    gpt_dict = []  # GPT词典
+    # 初始化 GPT 词典列表
+    gpt_dict = []
 
-    # 处理每种词典类型
-    for dict_type, glossary in [("pre", pre_dict), ("post", post_dict), ("gpt", gpt_dict)]:
-        if dict_type not in config:
-            continue  # 如果配置中没有该类型，跳过
+    # 遍历每个文件
+    for file in files:
+        with open(file, encoding="utf-8") as f:
+            # 逐行读取文件内容
+            for line in f:
+                # 清理行内容，去除首尾空格
+                line = line.strip()
 
-        # 处理文件中的术语
-        for dict_file in config[dict_type].get("file", []):
-            with open(dict_file, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("//"):
-                        continue  # 跳过空行和注释
+                # 跳过空行和注释行、无效行
+                if not line or line.startswith("//") or "->" not in line:
+                    continue
 
-                    # 移除行内注释
-                    line = line.split("//")[0].strip()
-                    if "->" not in line:
-                        continue  # 跳过无效行
+                # 分割源文本和目标文本
+                source, target = [part.strip() for part in line.split("->", 1)]
+                entry = {"source": source, "target": target}
 
-                    # 分割源文本和目标文本
-                    source, target = [part.strip() for part in line.split("->", 1)]
-                    entry = {"source": source, "target": target}
+                # 处理描述字段
+                if " #" in target:
+                    target, description = target.split(" #", 1)
+                    entry.update({
+                        "target": target.strip(),
+                        "description": description.strip()
+                    })
 
-                    # 处理GPT词典的特殊描述字段
-                    if dict_type == "gpt" and " #" in target:
-                        target, description = target.split(" #", 1)
-                        entry.update({
-                            "target": target.strip(),
-                            "description": description.strip()
-                        })
+                gpt_dict.append(entry)
 
-                    glossary.append(entry)
-
-        # 添加直接配置的术语项
-        glossary.extend(
-            item for item in config[dict_type].get("list", [])
-            if "source" in item and "target" in item
-        )
-
-    return pre_dict, post_dict, gpt_dict
+    return gpt_dict
 
 
 def read_texts_to_translate(project_path: str) -> Iterator[tuple[pathlib.Path, list[dict[str, Any]]]]:
@@ -133,8 +136,8 @@ def read_texts_to_translate(project_path: str) -> Iterator[tuple[pathlib.Path, l
     """
     # 递归查找所有JSON文件
     for json_file in pathlib.Path(project_path).glob("**/*.json"):
-        with open(json_file, "r", encoding="utf-8") as file:
-            file_content = json.load(file)
+        with open(json_file, "rb") as file:
+            file_content = orjson.load(file)
 
         # 筛选需要翻译的有效条目
         valid_entries = [
