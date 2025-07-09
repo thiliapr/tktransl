@@ -1,10 +1,8 @@
 "SakuraLLM的翻译部分"
-# Copyright (C) 2025  thiliapr
-# Email: thiliapr@tutanota.com
-# 本文件是 tktransl 的一部分。
-# tktransl 是自由软件：你可以再分发之和/或依照由自由软件基金会发布的 GNU Affero 通用公共许可证修改之，无论是版本 3 许可证，还是（按你的决定）任何以后版都可以。
-# 发布 tktransl 是希望它能有用，但是并无保障；甚至连可销售和符合某个特定的目的都不保证。请参看 GNU Affero 通用公共许可证，了解详情。
-# 你应该随程序获得一份 GNU Affero 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
+# 本文件是 tktransl 的一部分
+# SPDX-FileCopyrightText: 2025 thiliapr <thiliapr@tutanota.com>
+# SPDX-FileContributor: thiliapr <thiliapr@tutanota.com>
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 import json
 from typing import Any, Optional, Iterator
