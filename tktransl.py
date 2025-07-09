@@ -12,17 +12,13 @@ import time
 import warnings
 from typing import Any, Union
 
+from tqdm import tqdm
+from utils import read_work_info, read_glossary, read_texts_to_translate
+from sakurallm import TranslateError, TranslationCountError, batch_translate
+
 DEFAULT_BATCH_SIZE = 7
 DEFAULT_HISTORY_SIZE = 2
 DEFAULT_TIMEOUT = 30
-
-# 根据是否在 Jupyter 环境下导入不同库
-if "get_ipython" in globals():
-    from tqdm.notebook import tqdm_notebook as tqdm
-else:
-    from tqdm import tqdm
-    from utils import read_work_info, read_glossary, read_texts_to_translate
-    from sakurallm import TranslateError, TranslationCountError, batch_translate
 
 
 def thread_wrapper(

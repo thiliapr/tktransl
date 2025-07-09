@@ -14,19 +14,11 @@ from typing import Any, Iterator
 
 def read_work_info() -> dict[str, Any]:
     """
-    读取工作配置信息，优先从内存中获取，其次从work.json文件加载。
-
-    该函数实现了以下功能：
-    1. 首先检查全局变量中是否已存在 WORK_INFO
-    2. 如果存在，直接返回该变量（避免重复读取文件）
-    3. 如果不存在，从 work.json 文件读取配置
+    从work.json文件加载工作配置信息。
 
     Returns:
         包含工作配置信息的字典
     """
-    if "WORK_INFO" in globals():  # 如果已经定义`WORK_INFO`，使用其作为工作信息
-        return globals()["WORK_INFO"]  # 为了避免检查，从`globals()`读取工作信息
-
     with open("work.json", encoding="utf-8") as f:
         return json.load(f)
 

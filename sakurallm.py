@@ -7,12 +7,9 @@
 # 你应该随程序获得一份 GNU Affero 通用公共许可证的复本。如果没有，请看 <https://www.gnu.org/licenses/>。
 
 import json
-import httpx
 from typing import Any, Optional, Iterator
-
-# 在非 Kaggle 环境下导入工具库
-if "get_ipython" not in globals():
-    from utils import generate_placeholder_token
+import httpx
+from utils import generate_placeholder_token
 
 
 SYSTEM_PROMPT = "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。"
@@ -81,7 +78,7 @@ def ask_stream(
         proxy=proxy,
         timeout=timeout,
         json={
-            "model": "gpt-3.5-turbo",
+            "model": "sakura",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt}
