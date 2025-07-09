@@ -91,7 +91,7 @@ python tktransl.py
 - 在使用多个 API 时，流式输出功能将被禁用。
 - 在 Kaggle 环境中运行该程序时，可以直接定义`WORK_INFO`全局变量而不写入配置文件。
 - ~~由于这个程序全盘抄袭[GalTransl](https://github.com/GalTransl/GalTransl/)，所以~~有时候更新不是那么的及时。
-- 支持的模型: [`Sakura-GalTransl-7B-v3-Q5_K_S.gguf`](https://huggingface.co/SakuraLLM/Sakura-GalTransl-7B-v3/blob/main/Sakura-GalTransl-7B-v3-Q5_K_S.gguf)
+- 支持的模型: [`Sakura-Galtransl-14B-v3.7-Q5_K_S.gguf`](https://hf-mirror.com/SakuraLLM/Sakura-GalTransl-14B-v3.7/blob/main/Sakura-Galtransl-14B-v3.7-Q5_K_S.gguf)
 - System Prompt:
   ```plain
   你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。
