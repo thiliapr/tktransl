@@ -5,9 +5,9 @@ TkTransl 是一个[GalTransl模型](https://huggingface.co/SakuraLLM/Sakura-GalT
 该程序旨在提高翻译效率，允许用户通过配置文件自定义翻译参数，并支持多个翻译 API 的并行调用。
 
 ## License
-![GNU GPL Version 3 Official Logo](https://www.gnu.org/graphics/gplv3-with-text-136x68.png)
+![GNU AGPL Version 3 Logo](https://www.gnu.org/graphics/agplv3-with-text-162x68.png)
 
-TkTransl 是自由软件，遵循[GNU 通用公共许可证）第 3 版或任何后续版本]((https://www.gnu.org/licenses/gpl-3.0.html))。你可以自由地使用、修改和分发该软件，但不提供任何明示或暗示的担保。有关详细信息，请参见 GNU 通用公共许可证。
+tkaimidi 是自由软件，遵循`Affero GNU 通用公共许可证第 3 版或任何后续版本`。你可以自由地使用、修改和分发该软件，但不提供任何明示或暗示的担保。有关详细信息，请参见 [Affero GNU 通用公共许可证](https://www.gnu.org/licenses/agpl-3.0.html)。
 
 ## 安装与依赖
 ```bash
