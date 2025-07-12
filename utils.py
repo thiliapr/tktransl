@@ -170,9 +170,14 @@ def generate_placeholder_token(base_name: str, text: str, max_attempts: int = 10
         >>> print(token)
         <test-456>  # 随机生成的数字，保证不在原文本中
     """
-    max_attempts = 10
+    # 检查基础名称是否在文本中，如果不在，则直接返回标记
+    token = f"<{base_name}>"
+    if token not in text:
+        return token
+
+    # 尝试生成一个唯一标记，直到成功或达到最大尝试次数
     for _ in range(max_attempts):
-        token = f"<{base_name}-{random.randint(0, 2**16)}>"
+        token = f"<{base_name}-{random.randint(0, 2**6)}>"
         if token not in text:
             return token
     raise RuntimeError(f"无法为`{base_name}`生成唯一标记")
