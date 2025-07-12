@@ -59,7 +59,7 @@ def main():
     parser.add_argument("project-path", type=str, help="待翻译项目的路径")
     parser.add_argument("endpoints", type=str, nargs="+", help="API端点列表，至少一个")
     parser.add_argument("-b", "--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="每次翻译的文本数量，默认为 %(default)s")
-    parser.add_argument("-h", "--history-size", type=int, default=DEFAULT_HISTORY_SIZE, help="翻译时提供给模型的历史翻译记录的数量，默认为 %(default)s")
+    parser.add_argument("-i", "--history-size", type=int, default=DEFAULT_HISTORY_SIZE, help="翻译时提供给模型的历史翻译记录的数量，默认为 %(default)s")
     parser.add_argument("-s", "--stream-output", action="store_true", help="启用流式输出模式，逐条显示翻译结果")
     parser.add_argument("-p", "--pre-dict", type=str, action="append", default=[], help="译前处理术语表文件路径，可以多次指定")
     parser.add_argument("-o", "--post-dict", type=str, action="append", default=[], help="译后处理术语表文件路径，可以多次指定")
