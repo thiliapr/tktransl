@@ -139,11 +139,11 @@ def read_texts_to_translate(project_path: str) -> Iterator[tuple[pathlib.Path, l
         with open(json_file, "rb") as file:
             file_content = orjson.loads(file.read())
 
-        # 筛选需要翻译的有效条目
+        # 筛选需要翻译的有效条目（source.strip() 非空且 target 字段不存在或为空）
         valid_entries = [
             {"index": idx, **entry}
             for idx, entry in enumerate(file_content)
-            if entry.get("source") and not entry.get("target")
+            if entry.get("source", "").strip() and not entry.get("target")
         ]
 
         # 只添加有需要翻译内容的文件
