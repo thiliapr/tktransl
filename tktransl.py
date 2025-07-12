@@ -175,8 +175,12 @@ def main():
                         # 启动翻译线程
                         threading.Thread(
                             target=thread_wrapper,
-                            args=(lock, result_container, text_to_translate, translated_results[-args.history_size:], gpt_dict, endpoint),
+                            args=(lock, result_container),
                             kwargs={
+                                "source_texts": text_to_translate,
+                                "translation_history": translated_results[-args.history_size:],
+                                "glossary_terms": gpt_dict,
+                                "endpoint": endpoint,
                                 "stream_output": stream_output,
                                 "timeout": args.timeout,
                                 "proxy": args.proxy,
