@@ -76,7 +76,7 @@ def main():
     args = parser.parse_args()
 
     # 如果启用了流式输出，但有多个API端点，则禁用流式输出模式，因为多API并行时不支持流式显示
-    if args.stream_output and len(args.endpoints) > 1:
+    if (stream_output := args.stream_output) and len(args.endpoints) > 1:
         stream_output = False
         warnings.warn(f"已禁用流式输出模式（多API并行时不支持流式显示）。当前配置API数量: {len(args.endpoints)}。")
 
