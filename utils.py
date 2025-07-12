@@ -137,7 +137,7 @@ def read_texts_to_translate(project_path: str) -> Iterator[tuple[pathlib.Path, l
     # 递归查找所有JSON文件
     for json_file in pathlib.Path(project_path).glob("**/*.json"):
         with open(json_file, "rb") as file:
-            file_content = orjson.load(file)
+            file_content = orjson.loads(file.read())
 
         # 筛选需要翻译的有效条目
         valid_entries = [
