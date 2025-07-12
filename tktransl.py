@@ -108,6 +108,9 @@ def main():
         # 流式输出时禁用进度条
         progress_bar = tqdm(desc=file.name, total=total_texts, disable=stream_output)
 
+        # 剔除无意义的文本（如空行或仅包含空格的行）
+        untranslated_texts = [text for text in untranslated_texts if text["source"].strip()]
+
         # 应用译前翻译术语替换
         for source in untranslated_texts:
             for entry in pre_dict:
