@@ -104,7 +104,9 @@ def main():
 
         # 初始化进度跟踪
         total_texts = len(untranslated_texts)
-        progress_bar = tqdm(desc=file.name, total=total_texts)
+
+        # 流式输出时禁用进度条
+        progress_bar = tqdm(desc=file.name, total=total_texts, disable=stream_output)
 
         # 应用译前翻译术语替换
         for source in untranslated_texts:
