@@ -100,7 +100,7 @@ def ask_stream(
 
         # 处理流式响应
         for line in response.iter_lines():
-            if not line:
+            if not line.startswith("data: "):
                 continue
 
             # 删除`data: `
