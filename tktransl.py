@@ -57,7 +57,7 @@ def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description="TkTransl 翻译工具")
     parser.add_argument("project-path", type=str, help="待翻译项目的路径")
-    parser.add_argument("endpoints", type=str, nargs="+", help="API端点列表，至少一个")
+    parser.add_argument("endpoints", type=str, nargs="+", help="API端点列表，至少一个，示例：`http://127.0.0.1:8000`")
     parser.add_argument("-b", "--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="每次翻译的文本数量，默认为 %(default)s")
     parser.add_argument("-i", "--history-size", type=int, default=DEFAULT_HISTORY_SIZE, help="翻译时提供给模型的历史翻译记录的数量，默认为 %(default)s")
     parser.add_argument("-s", "--stream-output", action="store_true", help="启用流式输出模式，逐条显示翻译结果")
