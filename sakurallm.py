@@ -230,7 +230,7 @@ def batch_translate(
 
     # 获取翻译结果
     api_response = ""
-    for response_chunk in ask_stream(endpoint, final_prompt, temperature, top_p, presence_penalty, frequency_penalty, proxy, timeout):
+    for response_chunk in ask_stream(endpoint, final_prompt, temperature, top_p, presence_penalty, frequency_penalty, timeout, proxy):
         api_response += response_chunk
         if stream_output:
             print(response_chunk, end="", flush=True)
